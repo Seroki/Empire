@@ -1,0 +1,380 @@
+You are part of the orginal programers of Evony age one as a Anversity project you have desided to recreate the game with the newer tools but with the old game play. But you have lost your personal note and now must lean on old web data to pull the game out of the moth balls and back to a online condistion. Research and gather data point from web sources about Evony Age 1 for an Evony Age I Recreation
+
+You are a senior game systems architect and database designer specializing in classic browser-based MMORTS games.
+your focus to research and devolope for this portion of the GDS
+
+Volume I — Core Game
+Introduction to Evony Age I
+
+    Genre: Browser-based MMORTS
+    Core gameplay loop: city building, resource management, research, military conquest
+    Win / loss conditions: territorial dominance, timing, resource exhaustion (to be defined)
+    Time progression: tick-based system (e.g., 1 tick per minute)
+
+Volume II — World
+
+Everything about the world.
+
+Examples
+
+World map
+Coordinates
+NPC cities
+Valleys
+Terrain
+Distance
+Movement
+Spawn rules
+Map generation
+
+Volume III — Buildings
+
+Every building documented individually.
+
+For every building include:
+
+Description
+Purpose
+Maximum level
+Costs
+Upgrade scaling
+Effects
+Dependencies
+Unlocks
+UI
+Original Age I behavior
+Notes for recreation
+
+Example
+
+Academy
+
+Purpose
+
+Research Technologies
+
+Dependencies
+
+Town Hall 2
+
+Unlocks
+
+Agriculture
+Construction
+Archery
+Engineering
+
+Effects
+
+Research Queue
+
+Scaling
+
+Research Speed
+
+Repeat for every building.
+
+
+Volume IV — Resource Fields
+
+Each resource field becomes its own specification.
+
+Farm
+
+Production Formula
+Workers
+Bonuses
+Hero modifiers
+Technology modifiers
+
+Repeat for
+
+Lumber
+Quarry
+Iron
+
+Volume V — Technologies
+
+Every technology gets a complete page.
+
+Example
+
+Agriculture
+
+Description
+
+Food production research
+
+Levels
+
+10
+
+Requirements
+
+Academy
+
+Effects
+
+Level 1
+
++5%
+
+Level 2
+
++10%
+
+...
+
+Unlocks
+
+None
+
+Repeat for every research item.
+
+
+Volume VI — Units
+
+Every troop.
+
+Worker
+
+Warrior
+
+Scout
+
+Pikeman
+
+Archer
+
+Cavalry
+
+Ballista
+
+Catapult
+
+etc.
+
+Each includes:
+
+Stats
+Costs
+Time
+Research
+Buildings
+Upkeep
+Combat formulas
+AI behavior
+
+Volume VII — Heroes
+
+Every mechanic.
+
+Attributes
+
+Politics
+Attack
+Intelligence
+Leadership
+
+Hiring
+
+Loyalty
+
+Equipment
+
+Mayor
+
+General
+
+Experience
+
+Ranking
+
+Promotion
+
+Everything.
+
+Volume VIII — Combat
+
+Probably the largest section.
+
+Should include:
+
+Marching
+Distance
+Speed
+Terrain
+Attack formulas
+Defense formulas
+Wall combat
+Trap damage
+Siege
+Reinforcements
+Hero bonuses
+Randomness
+Casualties
+
+Volume IX — Economy
+
+Everything numerical.
+
+Resource production
+
+Population
+
+Taxes
+
+Gold
+
+NPC income
+
+Maintenance
+
+Warehouse protection
+
+Storage
+
+
+Volume X — Dependencies
+
+This becomes the heart of the entire game.
+
+Everything should become graphs.
+
+Building Graph
+
+Research Graph
+
+Unit Graph
+
+Hero Graph
+
+Quest Graph
+
+NPC Graph
+
+Equipment Graph
+
+Technology Graph
+
+Nothing should be left undocumented.
+
+
+Volume XI — Quests
+
+Every tutorial quest.
+
+Every reward.
+
+Every unlock.
+
+Quest chains.
+
+Dependencies.
+
+
+Volume XII — Database Mapping
+
+Only now do we begin talking about SQL.
+
+Every object becomes tables.
+
+Every dependency becomes foreign keys.
+
+Everything references the GDS.
+
+
+Volume XIII — API
+
+Every endpoint.
+
+Examples
+
+POST /login
+
+POST /cities
+
+GET /buildings
+
+POST /upgrade
+
+GET /research
+
+POST /research
+
+GET /heroes
+
+POST /attack
+
+GET /quests
+Volume XIV — Server Logic
+
+Algorithms only.
+
+No SQL.
+
+No UI.
+
+Pure gameplay.
+
+Examples
+
+Can Build
+
+Can Upgrade
+
+Can Train
+
+Can Attack
+
+Can Research
+
+Can Recruit Hero
+
+Can Claim Valley
+
+Resolve Combat
+
+Volume XV — Balancing
+
+The numbers.
+
+Growth curves.
+
+Research curves.
+
+Training curves.
+
+Resource curves.
+
+Combat curves.
+
+Everything that makes Age I feel like Age I.
+
+One More Volume I'd Add
+
+For your project specifically, I'd add a dedicated "Historical Reference & Recreation Notes" volume.
+
+For every mechanic, classify it as:
+
+Confirmed — Verified from archived game data, screenshots, or multiple independent sources.
+Strongly Inferred — Consistent with observed gameplay but not directly documented.
+Custom — An intentional enhancement for your remake.
+
+For example:
+
+Building: Academy
+
+Original Behavior:
+Confirmed
+
+Research Queue:
+Confirmed
+
+Research Speed Formula:
+Strongly Inferred
+
+Additional Research Categories:
+Custom
+
+This gives you a clear boundary between faithfully recreating Evony Age I and extending it with your own ideas. Years from now, you'll still know which mechanics came from the original game and which were design decisions you made.

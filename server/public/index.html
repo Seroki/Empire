@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Empire Core — Command Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #14110d;
+    --panel: #1e1912;
+    --panel-raised: #241e15;
+    --line: #3d3020;
+    --brass: #c89b3c;
+    --brass-dim: #8a6e2c;
+    --green: #6b8f5a;
+    --rust: #a8462e;
+    --parchment: #eae0cb;
+    --faded: #8a7c63;
+
+    --font-display: 'Cinzel', serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ink);
+    background-image: radial-gradient(ellipse at top, rgba(200,155,60,0.06), transparent 60%);
+    color: var(--parchment);
+    font-family: var(--font-mono);
+    padding: 8px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 6px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+  }
+
+  th, td {
+    border: 1px solid var(--line);
+    padding: 6px 8px;
+    font-size: 11px;
+    text-align: left;
+  }
+
+  th {
+    background: var(--panel-raised);
+    color: var(--brass);
+    font-family: var(--font-display);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-size: 11px;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 3fr 1fr;
+    grid-template-rows: auto auto auto;
+    gap: 8px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .topbar { grid-column: 1 / span 2; }
+  .city { grid-column: 1 / span 1; }
+  .rightpanel { grid-column: 2 / span 1; }
+  .bottombar { grid-column: 1 / span 2; }
+
+  /* Ticker & Resources Styling */
+  .ticker-cell { text-align: center; }
+  .ticker-label {
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: var(--faded);
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+  .ticker-value {
+    font-weight: 600;
+    color: var(--parchment);
+    transition: color 0.4s ease;
+    font-size: 12px;
+  }
+  .ticker-value.tick { color: var(--brass); }
+
+  .pop-row {
+    display: flex;
+    justify-content: space-between;
+    color: var(--faded);
+    font-size: 10px;
+    line-height: 1.3;
+  }
+  .pop-row strong { color: var(--parchment); }
+
+  /* Controls & Action Buttons */
+  .tax-control-inline {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .tax-control-inline input {
+    width: 44px;
+    background: var(--ink);
+    border: 1px solid var(--line);
+    color: var(--parchment);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 2px 4px;
+    text-align: center;
+  }
+  .action-btn {
+    background: var(--panel-raised);
+    border: 1px solid var(--brass-dim);
+    color: var(--brass);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    padding: 4px 8px;
+    cursor: pointer;
+    width: 100%;
+    text-align: center;
+    transition: all 0.15s ease;
+  }
+  .action-btn:hover:not(:disabled) {
+    background: var(--brass);
+    color: var(--ink);
+  }
+  .action-btn:disabled {
+    border-color: var(--line);
+    color: var(--faded);
+    cursor: not-allowed;
+    background: transparent;
+  }
+
+  /* Section Headers & Slot Badges */
+  .section-header {
+    font-family: var(--font-display);
+    color: var(--brass);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 6px 8px;
+    background: var(--panel-raised);
+    border: 1px solid var(--line);
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .slot-badge {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: normal;
+    color: var(--faded);
+    background: var(--ink);
+    padding: 2px 6px;
+    border: 1px solid var(--line);
+  }
+  .slot-badge strong { color: var(--parchment); }
+  .slot-badge strong.open { color: var(--green); }
+
+  /* Building Cards & Grids */
+  .buildings-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+
+  .building-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 72px;
+    flex: 1 1 130px;
+    max-width: 160px;
+  }
+
+  .building-card.under-construction {
+    border-color: var(--rust);
+    animation: pulse-rust 2.4s ease-in-out infinite;
+  }
+
+  .building-card.slot-open {
+    border: 1px dashed var(--green);
+    background: rgba(107, 143, 90, 0.05);
+  }
+
+  /* Compact Locked Slot Variant */
+  .building-card.slot-locked {
+    flex: 0 0 64px;
+    max-width: 64px;
+    min-height: 52px;
+    height: 52px;
+    padding: 4px;
+    border: 1px solid var(--line);
+    background: rgba(20, 17, 13, 0.4);
+    opacity: 0.55;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    cursor: not-allowed;
+    transition: opacity 0.2s ease, border-color 0.2s ease;
+  }
+
+  .building-card.slot-locked:hover {
+    opacity: 0.85;
+    border-color: var(--brass-dim);
+  }
+
+  .lock-icon {
+    width: 18px;
+    height: 18px;
+    fill: var(--faded);
+  }
+
+  .lock-th-tag {
+    font-size: 8px;
+    color: var(--faded);
+    line-height: 1;
+    text-align: center;
+  }
+
+  @keyframes pulse-rust {
+    0%, 100% { border-color: var(--rust); }
+    50% { border-color: rgba(168,70,46,0.35); }
+  }
+
+  .b-name { font-size: 11px; color: var(--parchment); font-weight: 600; margin-bottom: 2px; }
+  .b-meta { display: flex; justify-content: space-between; font-size: 10px; color: var(--faded); margin-bottom: 4px; }
+  .b-level { color: var(--brass); font-weight: 600; }
+  .b-tag.building { color: var(--rust); }
+
+  .btn-edit-inline {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--brass-dim);
+    font-size: 9px;
+    padding: 1px 4px;
+    cursor: pointer;
+    margin-left: 4px;
+  }
+  .btn-edit-inline:hover {
+    border-color: var(--brass);
+    color: var(--brass);
+  }
+
+  /* Construction Queue Tickets */
+  .ticket {
+    background: var(--panel-raised);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--brass);
+    padding: 6px;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .seal {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid var(--brass);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--brass);
+  }
+  .ticket-name { font-size: 11px; color: var(--parchment); }
+  .ticket-sub { font-size: 9px; color: var(--faded); text-transform: uppercase; }
+
+  .empty-note {
+    font-size: 10px;
+    color: var(--faded);
+    padding: 8px;
+    border: 1px dashed var(--line);
+    text-align: center;
+    width: 100%;
+  }
+
+  /* Modals and Alerts */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(10,8,5,0.85);
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 1rem;
+  }
+  .modal-overlay.visible { display: flex; }
+  .modal-panel {
+    background: var(--panel-raised);
+    border: 1px solid var(--rust);
+    border-left: 3px solid var(--rust);
+    padding: 1.25rem;
+    max-width: 340px;
+    width: 100%;
+    text-align: center;
+  }
+  .modal-title {
+    font-family: var(--font-display);
+    font-size: 12px;
+    text-transform: uppercase;
+    color: var(--rust);
+    margin-bottom: 0.5rem;
+  }
+  .modal-message { font-size: 11px; color: var(--parchment); margin-bottom: 1rem; }
+
+  .city-selector-row {
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
+  .city-selector-row:hover {
+    background: var(--panel-raised);
+  }
+  .city-selector-row.active {
+    border-left: 2px solid var(--brass);
+  }
+  
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    .topbar, .city, .rightpanel, .bottombar { grid-column: 1 / span 1; }
+  }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <table>
+      <tr><th colspan="10">Top Bar — Player & Resource Management</th></tr>
+      <tr>
+        <td style="width: 45px;">Avatar</td>
+        <td>Player</td>
+        <td>Title</td>
+        <td>Prestige</td>
+        <td>Honor</td>
+        <td id="ticker"></td>
+      </tr>
+     <tr>
+  <td style="text-align: center;"><button class="action-btn" onclick="handleSystemAction('avatar_click')">IMG</button></td>
+  <td id="top-player-username">Loading...</td>
+  <td id="top-player-title">--</td>
+  <td id="top-player-prestige">0</td>
+  <td id="top-player-honor">0</td>
+  <td colspan="5" style="padding: 0;">
+    <table style="margin: 0; border: none; width: 100%;">
+      <!-- DYNAMIC WAREHOUSE SUB-HEADER -->
+      <tr id="warehouse-cap-row">
+        <td colspan="6" style="text-align: center; padding: 4px; border-bottom: 1px solid #4a3b2c; font-size: 0.9em; background-color: rgba(0, 0, 0, 0.2);">
+          <span style="color: #e0d8c3; font-weight: bold; margin-right: 12px;">
+            Warehouse Capacity <span id="wh-capacity">0</span>
+          </span>
+          <span style="color: #2ecc71; font-weight: bold;" id="wh-protected">0</span>
+          <span style="color: #e0d8c3;"> / </span>
+          <span style="color: #e74c3c; font-weight: bold;" id="wh-at-risk">0</span>
+        </td>
+      </tr>
+      <!-- RESOURCE TICKER ROW -->
+      <tr id="ticker-row">
+        <td class="ticker-cell"><div class="ticker-label">FOOD</div><div class="ticker-value" id="res-food">0</div></td>
+        <td class="ticker-cell"><div class="ticker-label">WOOD</div><div class="ticker-value" id="res-wood">0</div></td>
+        <td class="ticker-cell"><div class="ticker-label">STONE</div><div class="ticker-value" id="res-stone">0</div></td>
+        <td class="ticker-cell"><div class="ticker-label">IRON</div><div class="ticker-value" id="res-iron">0</div></td>
+        <td class="ticker-cell"><div class="ticker-label">GOLD</div><div class="ticker-value" id="res-gold">0</div></td>
+        <td class="ticker-cell" style="min-width: 150px;">
+          <div class="ticker-label">WORKFORCE & POPULATION</div>
+          <div id="res-population">--</div>
+        </td>
+      </tr>
+    </table>
+  </td>
+</tr>
+    </table>
+  </div>
+
+  <!-- CITY GRID & BUILDING MANAGERS -->
+  <div class="city">
+    <table>
+      <tr>
+        <th colspan="2">
+          City View — <span id="city-name">Loading...</span>
+          <button class="btn-edit-inline" onclick="editCityName()">Edit</button>
+          <span id="city-meta" style="font-weight: normal; font-family: var(--font-mono); font-size: 10px; color: var(--faded); margin-left: 8px;"></span>
+        </th>
+      </tr>
+      <tr>
+        <td colspan="2">
+          <!-- TOP SECTION: Town Hall & Inner Buildings -->
+          <div class="section-header">
+            <span>Town Hall & Inner City Buildings</span>
+            <span class="slot-badge" id="inner-slot-badge">Built: <strong>0</strong> | Unlocked: <strong class="open">0</strong> / <strong>32</strong></span>
+          </div>
+          <div class="buildings-grid" id="inner-city-buildings"></div>
+
+          <!-- MIDDLE SECTION: Outer Resource Fields -->
+          <div class="section-header">
+            <span>Outer Resource Fields (Wilderness Plots)</span>
+            <span class="slot-badge" id="outer-slot-badge">Built: <strong>0</strong> | Unlocked: <strong class="open">0</strong> / <strong>40</strong></span>
+          </div>
+          <div class="buildings-grid" id="outer-resource-fields"></div>
+
+          <!-- BOTTOM SECTION: Available to Construct -->
+          <div class="section-header">
+            <span>Available to Construct</span>
+          </div>
+          <div class="buildings-grid" id="available-to-be-built"></div>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="rightpanel">
+
+    <!-- Player Profile -->
+    <table>
+      <tr><th colspan="2">Player Profile</th></tr>
+      <tr>
+        <td>Name</td>
+        <td>
+          <span id="profile-player-username">Loading...</span>
+          <button class="btn-edit-inline" id="btn-edit-player" onclick="editPlayerUsername()">Edit</button>
+        </td>
+      </tr>
+      <tr><td>Title</td><td id="profile-player-title">Lord</td></tr>
+      <tr><td>Prestige</td><td id="profile-player-prestige">0</td></tr>
+      <tr><td>Honor</td><td id="profile-player-honor">0</td></tr>
+      <tr><td>Alliance</td><td id="profile-player-alliance">None</td></tr>
+    </table>
+
+    <!-- City Stats -->
+    <table>
+      <tr><th colspan="2">City Stats</th></tr>
+      <tr>
+        <td>Tax Rate</td>
+        <td>
+          <div class="tax-control-inline">
+            <input type="number" id="tax-rate-input" min="0" max="100" value="30">%
+            <button class="action-btn" style="width: auto;" onclick="submitTaxRate()">Set</button>
+          </div>
+        </td>
+      </tr>
+      <tr><td>Loyalty</td><td id="city-loyalty">100</td></tr>
+      <tr><td>Grievance</td><td id="city-grievance">0</td></tr>
+    </table>
+
+    <!-- City Selector -->
+    <table>
+      <tr><th colspan="2">City Selector</th></tr>
+      <tr class="city-selector-row active" onclick="switchCity(1)"><td>City 1</td><td style="color: var(--green);">[Active]</td></tr>
+      <tr class="city-selector-row" onclick="switchCity(2)"><td>City 2</td><td>[Select]</td></tr>
+      <tr class="city-selector-row" onclick="switchCity(3)"><td>City 3</td><td>[Select]</td></tr>
+      <tr class="city-selector-row" onclick="switchCity(4)"><td>City 4</td><td>[Select]</td></tr>
+      <tr class="city-selector-row" onclick="switchCity(5)"><td>City 5</td><td>[Select]</td></tr>
+    </table>
+
+    <!-- Timers & Construction Orders -->
+    <table>
+      <tr><th>Construction Queues & Timers</th></tr>
+      <tr>
+        <td>
+          <div id="queue"></div>
+        </td>
+      </tr>
+    </table>
+
+  </div>
+
+  <!-- BOTTOM BAR -->
+  <div class="bottombar">
+    <table>
+      <tr><th colspan="10">Bottom Action Bar</th></tr>
+      <tr>
+        <td>City</td>
+        <td>Map</td>
+        <td>Army</td>
+        <td>Quest</td>
+        <td>Reports</td>
+        <td>Mail</td>
+        <td>Alliance</td>
+        <td>Shop</td>
+        <td>Settings</td>
+        <td>Help</td>
+      </tr>
+      <tr>
+        <td><button class="action-btn" onclick="handleBottomNav('city')">City</button></td>
+        <td><button class="action-btn" onclick="handleBottomNav('map')">Map</button></td>
+        <td><button class="action-btn" onclick="handleBottomNav('army')">Army</button></td>
+        <td><button class="action-btn" onclick="handleBottomNav('quest')">Quest</button></td>
+        <td><button class="action-btn" onclick="handleBottomNav('reports')">Reports</button></td>
+        <td><button class="action-btn" onclick="handleBottomNav('mail')">Mail</button></td>
+        <td><button class="action-btn" onclick="handleBottomNav('alliance')">Alliance</button></td>
+        <td><button class="action-btn" onclick="handleBottomNav('shop')">Shop</button></td>
+        <td><button class="action-btn" onclick="handleBottomNav('settings')">Settings</button></td>
+        <td><button class="action-btn" onclick="handleBottomNav('help')">Help</button></td>
+      </tr>
+    </table>
+  </div>
+
+</div>
+
+<!-- DIALOG / NOTICE OVERLAY -->
+<div class="modal-overlay" id="modal-overlay" onclick="hideErrorModal(event)">
+  <div class="modal-panel" onclick="event.stopPropagation()">
+    <div class="modal-title" id="modal-title">Order Rejected</div>
+    <div class="modal-message" id="modal-message"></div>
+    <button class="action-btn" style="width: auto; padding: 4px 16px; margin: 0 auto;" onclick="hideErrorModal()">Dismiss</button>
+  </div>
+</div>
+
+<script>
+let currentCityId = 1;
+const RESOURCE_KEYS = ["food", "wood", "stone", "iron", "gold"];
+const API_BASE = ""; // relative — works from any device that can reach this server, not just localhost
+
+let taxInputTouched = false;
+let currentPlayerId = 1;
+let currentGameState = { queueBusy: false, currentResources: {} };
+
+// SVG Iso Lock Padlock
+const LOCK_ICON_SVG = `
+  <svg class="lock-icon" viewBox="0 0 24 24">
+    <path d="M12 2C9.24 2 7 4.24 7 7v3H6c-1.1 0-2 .9-2 2v9c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-9c0-1.1-.9-2-2-2h-1V7c0-2.76-2.24-5-5-5zm-3 5c0-1.66 1.34-3 3-3s3 1.34 3 3v3H9V7zm3 8c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2z"/>
+  </svg>
+`;
+
+function formatNumber(n) {
+  return Number(n || 0).toLocaleString("en-US");
+}
+
+function formatDuration(ms) {
+  if (ms <= 0) return "arriving";
+  const totalSeconds = Math.floor(ms / 1000);
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  const pad = (v) => String(v).padStart(2, "0");
+  return `${pad(h)}:${pad(m)}:${pad(s)}`;
+}
+
+function showErrorModal(message, title = "Order Rejected") {
+  document.getElementById("modal-title").textContent = title;
+  document.getElementById("modal-message").textContent = message;
+  document.getElementById("modal-overlay").classList.add("visible");
+}
+
+function hideErrorModal() {
+  document.getElementById("modal-overlay").classList.remove("visible");
+}
+
+/* UI Action Hooks */
+function handleBottomNav(action) {
+  showErrorModal(`Navigation module '${action.toUpperCase()}' action hook registered. Awaiting interface linking.`, "Module Hooked");
+}
+
+function handleSystemAction(action) {
+  showErrorModal(`System action triggered: '${action}'.`, "System Event");
+}
+
+function switchCity(id) {
+  currentCityId = id;
+  const rows = document.querySelectorAll('.city-selector-row');
+  rows.forEach((row, idx) => {
+    if (idx === id - 1) {
+      row.classList.add('active');
+      row.children[1].style.color = 'var(--green)';
+      row.children[1].textContent = '[Active]';
+    } else {
+      row.classList.remove('active');
+      row.children[1].style.color = '';
+      row.children[1].textContent = '[Select]';
+    }
+  });
+  refresh();
+}
+
+function renderPlayerProfile(player) {
+  if (!player) return;
+  currentPlayerId = player.id || 1;
+
+  document.getElementById("top-player-username").textContent = player.username || "Unknown";
+  document.getElementById("top-player-title").textContent = player.title || "Lord";
+  document.getElementById("top-player-prestige").textContent = formatNumber(player.prestige);
+  document.getElementById("top-player-honor").textContent = formatNumber(player.honor);
+
+  document.getElementById("profile-player-username").textContent = player.username || "Unknown";
+  document.getElementById("profile-player-title").textContent = player.title || "Lord";
+  document.getElementById("profile-player-prestige").textContent = formatNumber(player.prestige);
+  document.getElementById("profile-player-honor").textContent = formatNumber(player.honor);
+  document.getElementById("profile-player-alliance").textContent = player.alliance || "None";
+}
+
+async function editPlayerUsername() {
+  const currentName = document.getElementById("profile-player-username")?.textContent || "";
+  const newName = prompt("Enter new username:", currentName);
+  
+  if (newName && newName.trim() !== "" && newName !== currentName) {
+    try {
+      const res = await fetch(`${API_BASE}/players/${currentPlayerId}/name`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: newName.trim() })
+      });
+      const data = await res.json();
+      if (res.ok) refresh();
+      else showErrorModal(data.error || "Failed to update username");
+    } catch (err) {
+      showErrorModal("Could not connect to server.");
+    }
+  }
+}
+
+async function editCityName() {
+  const currentName = document.getElementById("city-name")?.textContent || "";
+  const newName = prompt("Enter new city name:", currentName);
+
+  if (newName && newName.trim() !== "" && newName !== currentName) {
+    try {
+      const res = await fetch(`${API_BASE}/cities/${currentCityId}/name`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newName.trim() })
+      });
+      const data = await res.json();
+      if (res.ok) refresh();
+      else showErrorModal(data.error || "Failed to update city name");
+    } catch (err) {
+      showErrorModal("Could not connect to server.");
+    }
+  }
+}
+
+async function submitTaxRate() {
+  const input = document.getElementById("tax-rate-input");
+  const value = Math.min(100, Math.max(0, Number(input.value) || 0));
+
+  try {
+    const res = await fetch(`${API_BASE}/cities/${currentCityId}/taxRate`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taxRate: value })
+    });
+    const result = await res.json();
+    if (res.ok) refresh();
+    else showErrorModal(result.error || "Failed to set tax rate");
+  } catch (err) {
+    showErrorModal("Could not reach the server.");
+  }
+}
+
+function populationCellHTML(resources, queue) {
+  const totalWorkers = Number(resources.workers || 0);
+  // Reserved workers come from the real construction_queue data —
+  // each queued item carries workers_used, which is the source of
+  // truth (not fields the backend never actually sent).
+  const reservedWorkers = (queue || []).reduce(
+    (sum, item) => sum + (Number(item.workers_used) || 0),
+    0
+  );
+  const availableWorkers = Math.max(0, totalWorkers - reservedWorkers);
+  const maxCap = Number(resources.cottagesPopulation || resources.basePopulation || resources.population || 0);
+
+  return `
+    <div class="pop-row"><span>Available Workers:</span><strong style="color: var(--green);">${formatNumber(availableWorkers)} / ${formatNumber(totalWorkers)}</strong></div>
+    <div class="pop-row"><span>Reserved Labor:</span><strong>${formatNumber(reservedWorkers)}</strong></div>
+    <div class="pop-row"><span>Cottage Cap:</span><strong>${formatNumber(maxCap)}</strong></div>
+  `;
+}
+
+function updateTicker(resources) {
+  currentGameState.currentResources = resources;
+  RESOURCE_KEYS.forEach(key => {
+    const el = document.getElementById(`res-${key}`);
+    if (!el) return;
+    const newVal = formatNumber(resources[key]);
+    if (el.textContent !== newVal) {
+      el.textContent = newVal;
+      el.classList.add("tick");
+      setTimeout(() => el.classList.remove("tick"), 500);
+    }
+  });
+
+  const popEl = document.getElementById("res-population");
+  if (popEl) {
+    // Pass currentGameState.constructionQueue (or currentGameState.queue) into populationCellHTML
+    const activeQueue = currentGameState.constructionQueue || currentGameState.queue || [];
+    popEl.innerHTML = populationCellHTML(resources, activeQueue);
+  }
+
+  if (!taxInputTouched) {
+    const taxInput = document.getElementById("tax-rate-input");
+    if (taxInput) taxInput.value = resources.tax_rate ?? 30;
+  }
+}
+
+function makeBuildingCard(b, isBusy) {
+  const storage = b.field_storage;
+  const storageHTML = storage ? `
+    <div style="margin: 4px 0;">
+      <div style="height: 5px; background: var(--ink); border: 1px solid var(--line); overflow: hidden;">
+        <div style="height:100%; width:${storage.percent}%; background: ${storage.full ? 'var(--rust)' : 'var(--brass)'};"></div>
+      </div>
+      <div style="font-size: 9px; color: var(--faded); margin-top: 2px;">${formatNumber(storage.stored)} / ${formatNumber(storage.capacity)} ${storage.full ? '(FULL)' : ''}</div>
+    </div>
+    <button class="action-btn" style="border-color: var(--green); color: var(--green); margin-bottom: 2px;" ${storage.stored <= 0 ? "disabled" : ""} onclick="collectResource(${b.id})">
+      Collect
+    </button>
+  ` : "";
+
+  return `
+    <div class="building-card ${b.level === 0 ? "under-construction" : ""}">
+      <div>
+        <div class="b-name">${b.building_name}</div>
+        <div class="b-meta">
+          <span>${b.level === 0 ? "" : `<span class="b-level">Lv ${b.level}</span>`}</span>
+          <span class="b-tag ${b.level === 0 ? "building" : ""}">${b.level === 0 ? "Building" : (b.slot_pool || "fixed")}</span>
+        </div>
+        ${storageHTML}
+      </div>
+      <button class="action-btn" ${b.level === 0 || isBusy ? "disabled" : ""} onclick="startBuildingAction('upgrade', ${b.id})">
+        ${b.level === 0 ? "In Progress" : "Upgrade"}
+      </button>
+    </div>
+  `;
+}
+
+async function collectResource(buildingId) {
+  try {
+    const res = await fetch(`${API_BASE}/cities/${currentCityId}/collect`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ buildingId })
+    });
+    const result = await res.json();
+    if (res.ok) refresh();
+    else showErrorModal(result.error || "Failed to collect resource");
+  } catch (err) {
+    showErrorModal("Could not reach the server.");
+  }
+}
+
+function renderBuildings(buildings, townHallLevel, isBusy) {
+  const innerEl = document.getElementById("inner-city-buildings");
+  const outerEl = document.getElementById("outer-resource-fields");
+
+  const innerList = (buildings || []).filter(b => b.slot_pool === 'inner' || b.slot_pool === 'fixed' || !b.slot_pool);
+  const outerList = (buildings || []).filter(b => b.slot_pool === 'outer');
+
+  const thLvl = townHallLevel || 1;
+
+  // --- INNER SLOTS CALCULATION ---
+  const totalUnlockedInner = Math.min(32, 5 + (thLvl * 3));
+  const builtInnerCount = innerList.length;
+  const openInnerCount = Math.max(0, totalUnlockedInner - builtInnerCount);
+  const lockedInnerCount = 32 - totalUnlockedInner;
+
+  document.getElementById("inner-slot-badge").innerHTML = 
+    `Built: <strong>${builtInnerCount}</strong> | Unlocked: <strong class="open">${totalUnlockedInner}</strong> / <strong>32</strong>`;
+
+  let innerHTML = innerList.map(b => makeBuildingCard(b, isBusy)).join("");
+
+  // Render open inner slots
+  for (let i = 0; i < openInnerCount; i++) {
+    innerHTML += `
+      <div class="building-card slot-open">
+        <div>
+          <div class="b-name" style="color: var(--green);">Empty Plot</div>
+          <div class="b-meta"><span style="color: var(--green);">Available</span></div>
+        </div>
+        <button class="action-btn" style="border-color: var(--green); color: var(--green);" onclick="document.getElementById('available-to-be-built').scrollIntoView({ behavior: 'smooth' })">
+          + Build
+        </button>
+      </div>
+    `;
+  }
+
+  // Render compact locked inner slots with padlock icon
+  for (let i = 0; i < lockedInnerCount; i++) {
+    const requiredTH = Math.ceil((totalUnlockedInner + i + 1 - 5) / 3);
+    innerHTML += `
+      <div class="building-card slot-locked" title="Requires Town Hall Lv ${requiredTH}">
+        ${LOCK_ICON_SVG}
+        <div class="lock-th-tag">TH ${requiredTH}</div>
+      </div>
+    `;
+  }
+
+  innerEl.innerHTML = innerHTML;
+
+  // --- OUTER SLOTS CALCULATION ---
+  const totalUnlockedOuter = Math.min(40, thLvl * 4);
+  const builtOuterCount = outerList.length;
+  const openOuterCount = Math.max(0, totalUnlockedOuter - builtOuterCount);
+  const lockedOuterCount = 40 - totalUnlockedOuter;
+
+  document.getElementById("outer-slot-badge").innerHTML = 
+    `Built: <strong>${builtOuterCount}</strong> | Unlocked: <strong class="open">${totalUnlockedOuter}</strong> / <strong>40</strong>`;
+
+  let outerHTML = outerList.map(b => makeBuildingCard(b, isBusy)).join("");
+
+  // Render open outer slots
+  for (let i = 0; i < openOuterCount; i++) {
+    outerHTML += `
+      <div class="building-card slot-open">
+        <div>
+          <div class="b-name" style="color: var(--green);">Open Field</div>
+          <div class="b-meta"><span style="color: var(--green);">Available</span></div>
+        </div>
+        <button class="action-btn" style="border-color: var(--green); color: var(--green);" onclick="document.getElementById('available-to-be-built').scrollIntoView({ behavior: 'smooth' })">
+          + Build Field
+        </button>
+      </div>
+    `;
+  }
+
+  // Render compact locked outer slots with padlock icon
+  for (let i = 0; i < lockedOuterCount; i++) {
+    const requiredTH = Math.ceil((totalUnlockedOuter + i + 1) / 4);
+    outerHTML += `
+      <div class="building-card slot-locked" title="Requires Town Hall Lv ${requiredTH}">
+        ${LOCK_ICON_SVG}
+        <div class="lock-th-tag">TH ${requiredTH}</div>
+      </div>
+    `;
+  }
+
+  outerEl.innerHTML = outerHTML;
+}
+
+function renderAvailableToBeBuilt(availableList, isBusy) {
+  const el = document.getElementById("available-to-be-built");
+  if (!availableList || availableList.length === 0) {
+    el.innerHTML = `<div class="empty-note">No new structures available at current Town Hall level</div>`;
+    return;
+  }
+
+  el.innerHTML = availableList.map(b => `
+    <div class="building-card">
+      <div>
+        <div class="b-name">${b.name}</div>
+        <div class="b-meta">
+          <span class="b-level">Lv 1</span>
+          <span class="b-tag">${b.slot_pool || "fixed"}</span>
+        </div>
+      </div>
+      <button class="action-btn" ${isBusy ? "disabled" : ""} onclick="startBuildingAction('construct', ${b.id})">Build</button>
+    </div>
+  `).join("");
+}
+
+function renderQueue(queue) {
+  const el = document.getElementById("queue");
+  if (!queue || queue.length === 0) {
+    el.innerHTML = `<div class="empty-note">No active construction orders</div>`;
+    return;
+  }
+
+  el.innerHTML = queue.map(item => `
+    <div class="ticket" data-finish="${item.finish_time}">
+      <div class="seal" data-countdown>--:--:--</div>
+      <div class="ticket-body">
+        <div class="ticket-name">${item.building_name} → Lv ${item.target_level}</div>
+        <div class="ticket-sub">Order Dispatched</div>
+      </div>
+    </div>
+  `).join("");
+}
+
+function tickCountdowns() {
+  document.querySelectorAll("[data-finish]").forEach(ticket => {
+    const finish = new Date(ticket.getAttribute("data-finish")).getTime();
+    const remaining = finish - Date.now();
+    const seal = ticket.querySelector("[data-countdown]");
+    if (seal) seal.textContent = formatDuration(remaining);
+  });
+}
+
+/* Building Rule Checks */
+async function startBuildingAction(actionType, id) {
+  // Workers-as-a-resource governs concurrency server-side now — no
+  // more blanket "queue occupied" block. Multiple builds/upgrades can
+  // run at once as long as enough workers are available; the server
+  // rejects with a specific shortfall message otherwise.
+  const endpoint = actionType === 'construct' ? '/buildings/construct' : '/buildings/upgrade';
+
+  const body = actionType === 'construct'
+    ? { cityId: currentCityId, buildingTypeId: id }
+    : { cityId: currentCityId, buildingId: id };
+
+  try {
+    const res = await fetch(`${API_BASE}${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const result = await res.json();
+    if (res.ok) refresh();
+    else showErrorModal(result.error || result.message || "Failed to start construction");
+  } catch (err) {
+    showErrorModal("Could not reach the server endpoint.");
+  }
+}
+
+async function refresh() {
+  try {
+    const res = await fetch(`${API_BASE}/cities/${currentCityId}`);
+    const data = await res.json();
+
+    document.getElementById("city-name").textContent = data.city.name;
+    document.getElementById("city-meta").textContent = `(${data.city.x}, ${data.city.y}) · Founded ${new Date(data.city.created_at).toLocaleDateString()}`;
+    document.getElementById("city-loyalty").textContent = data.city.loyalty ?? 100;
+    document.getElementById("city-grievance").textContent = data.city.grievance ?? 0;
+
+    currentGameState.queue = data.queue || [];
+
+    if (data.player) renderPlayerProfile(data.player);
+    if (data.resources) updateTicker(data.resources);
+
+    // Render Warehouse Capacity & Protection Stats
+    if (data.warehouseStats) {
+      document.getElementById("wh-capacity").textContent = formatNumber(data.warehouseStats.capacity);
+      document.getElementById("wh-protected").textContent = formatNumber(data.warehouseStats.protected);
+      document.getElementById("wh-at-risk").textContent = formatNumber(data.warehouseStats.atRisk);
+    }
+
+    const isBusy = false;
+
+    const townHall = (data.buildings || []).find(b => b.building_type_id === 1 || b.building_name === "Town Hall");
+    const townHallLevel = townHall ? townHall.level : 1;
+
+    renderBuildings(data.buildings || [], townHallLevel, isBusy);
+    renderAvailableToBeBuilt(data.availableBuildings || [], isBusy);
+    renderQueue(data.queue || []);
+    tickCountdowns();
+
+  } catch (err) {
+    document.getElementById("city-meta").textContent = "Connection lost — retrying…";
+  }
+}
+
+document.getElementById("tax-rate-input")?.addEventListener("focus", () => { taxInputTouched = true; });
+
+refresh();
+setInterval(refresh, 5000);
+setInterval(tickCountdowns, 1000);
+</script>
+
+</body>
+</html>

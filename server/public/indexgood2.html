@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Evony Core — Command Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #14110d;
+    --panel: #1e1912;
+    --panel-raised: #241e15;
+    --line: #3d3020;
+    --brass: #c89b3c;
+    --brass-dim: #8a6e2c;
+    --green: #6b8f5a;
+    --rust: #a8462e;
+    --parchment: #eae0cb;
+    --faded: #8a7c63;
+
+    --font-display: 'Cinzel', serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ink);
+    background-image: radial-gradient(ellipse at top, rgba(200,155,60,0.06), transparent 60%);
+    color: var(--parchment);
+    font-family: var(--font-mono);
+    padding: 8px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 6px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+  }
+
+  th, td {
+    border: 1px solid var(--line);
+    padding: 6px 8px;
+    font-size: 11px;
+    text-align: left;
+  }
+
+  th {
+    background: var(--panel-raised);
+    color: var(--brass);
+    font-family: var(--font-display);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-size: 11px;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 3fr 1fr;
+    grid-template-rows: auto auto auto;
+    gap: 8px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .topbar { grid-column: 1 / span 2; }
+  .city { grid-column: 1 / span 1; }
+  .rightpanel { grid-column: 2 / span 1; }
+  .chat { grid-column: 1 / span 2; }
+  .bottombar { grid-column: 1 / span 2; }
+
+  /* Ticker & Resources Styling */
+  .ticker-cell {
+    text-align: center;
+  }
+  .ticker-label {
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: var(--faded);
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+  .ticker-value {
+    font-weight: 600;
+    color: var(--parchment);
+    transition: color 0.4s ease;
+    font-size: 12px;
+  }
+  .ticker-value.tick { color: var(--brass); }
+
+  .pop-row {
+    display: flex;
+    justify-content: space-between;
+    color: var(--faded);
+    font-size: 10px;
+    line-height: 1.3;
+  }
+  .pop-row strong { color: var(--parchment); }
+
+  /* Controls & Input */
+  .tax-control-inline {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .tax-control-inline input {
+    width: 44px;
+    background: var(--ink);
+    border: 1px solid var(--line);
+    color: var(--parchment);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 2px 4px;
+    text-align: center;
+  }
+  .tax-control-inline button {
+    background: var(--panel-raised);
+    border: 1px solid var(--brass-dim);
+    color: var(--brass);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    cursor: pointer;
+  }
+  .tax-control-inline button:hover {
+    background: var(--brass);
+    color: var(--ink);
+  }
+
+  /* Building Cards & Grids */
+  .section-header {
+    font-family: var(--font-display);
+    color: var(--brass);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 6px;
+    background: var(--panel-raised);
+    border: 1px solid var(--line);
+    margin-bottom: 6px;
+  }
+
+  .buildings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+
+  .building-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  .building-card.under-construction {
+    border-color: var(--rust);
+    animation: pulse-rust 2.4s ease-in-out infinite;
+  }
+
+  @keyframes pulse-rust {
+    0%, 100% { border-color: var(--rust); }
+    50% { border-color: rgba(168,70,46,0.35); }
+  }
+
+  .b-name { font-size: 11px; color: var(--parchment); font-weight: 600; margin-bottom: 2px; }
+  .b-meta { display: flex; justify-content: space-between; font-size: 10px; color: var(--faded); margin-bottom: 4px; }
+  .b-level { color: var(--brass); font-weight: 600; }
+  .b-tag.building { color: var(--rust); }
+
+  .btn-build {
+    background: var(--panel-raised);
+    border: 1px solid var(--brass-dim);
+    color: var(--brass);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    padding: 3px 4px;
+    cursor: pointer;
+    width: 100%;
+  }
+
+  .btn-build:hover:not(:disabled) {
+    background: var(--brass);
+    color: var(--ink);
+  }
+
+  .btn-build:disabled {
+    border-color: var(--line);
+    color: var(--faded);
+    cursor: not-allowed;
+    background: transparent;
+  }
+
+  /* Slot Progress Bars */
+  .slot-block {
+    margin-bottom: 8px;
+  }
+  .slot-head {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--faded);
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+  .bar-track {
+    height: 6px;
+    background: var(--ink);
+    border: 1px solid var(--line);
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--brass-dim), var(--brass));
+    transition: width 0.6s ease;
+  }
+  .bar-fill.full { background: linear-gradient(90deg, #7a2e1c, var(--rust)); }
+
+  /* Construction Queue Tickets */
+  .ticket {
+    background: var(--panel-raised);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--brass);
+    padding: 6px;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .seal {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid var(--brass);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--brass);
+  }
+  .ticket-name { font-size: 11px; color: var(--parchment); }
+  .ticket-sub { font-size: 9px; color: var(--faded); text-transform: uppercase; }
+
+  .empty-note {
+    font-size: 10px;
+    color: var(--faded);
+    padding: 8px;
+    border: 1px dashed var(--line);
+    text-align: center;
+  }
+
+  /* Modal Overlay */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(10,8,5,0.85);
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 1rem;
+  }
+  .modal-overlay.visible { display: flex; }
+  .modal-panel {
+    background: var(--panel-raised);
+    border: 1px solid var(--rust);
+    border-left: 3px solid var(--rust);
+    padding: 1.25rem;
+    max-width: 320px;
+    width: 100%;
+    text-align: center;
+  }
+  .modal-title {
+    font-family: var(--font-display);
+    font-size: 12px;
+    text-transform: uppercase;
+    color: var(--rust);
+    margin-bottom: 0.5rem;
+  }
+  .modal-message { font-size: 11px; color: var(--parchment); margin-bottom: 1rem; }
+  
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    .topbar, .city, .rightpanel, .chat, .bottombar { grid-column: 1 / span 1; }
+  }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <table>
+      <tr><th colspan="10">Top Bar — Player & Empire Dashboard</th></tr>
+      <tr>
+        <td style="width: 45px;">Avatar</td>
+        <td>Player</td>
+        <td>Title</td>
+        <td>Prestige</td>
+        <td>Honor</td>
+        <td id="ticker">
+          <!-- Dynamic Ticker injected here; fallback structure below -->
+        </td>
+      </tr>
+      <tr>
+        <td>[IMG]</td>
+        <td>SKYY</td>
+        <td>Lord</td>
+        <td>123456</td>
+        <td>7890</td>
+        <td colspan="5" style="padding: 0;">
+          <table style="margin: 0; border: none;">
+            <tr id="ticker-row">
+              <td class="ticker-cell"><div class="ticker-label">FOOD</div><div class="ticker-value" id="res-food">0</div></td>
+              <td class="ticker-cell"><div class="ticker-label">WOOD</div><div class="ticker-value" id="res-wood">0</div></td>
+              <td class="ticker-cell"><div class="ticker-label">STONE</div><div class="ticker-value" id="res-stone">0</div></td>
+              <td class="ticker-cell"><div class="ticker-label">IRON</div><div class="ticker-value" id="res-iron">0</div></td>
+              <td class="ticker-cell"><div class="ticker-label">GOLD</div><div class="ticker-value" id="res-gold">0</div></td>
+              <td class="ticker-cell"><div class="ticker-label">WORKERS</div><div class="ticker-value" id="res-workers">0</div></td>
+              <td class="ticker-cell" style="min-width: 140px;">
+                <div class="ticker-label">POPULATION</div>
+                <div id="res-population">--</div>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- CITY GRID -->
+  <div class="city">
+    <table>
+      <tr>
+        <th colspan="2">
+          City View — <span id="city-name">Loading...</span> 
+          <span id="city-meta" style="font-weight: normal; font-family: var(--font-mono); font-size: 10px; color: var(--faded); margin-left: 8px;"></span>
+        </th>
+      </tr>
+      <tr>
+        <td colspan="2">
+          <div class="section-header">Existing City Buildings</div>
+          <div class="buildings-grid" id="buildings"></div>
+
+          <div class="section-header">Available to be built</div>
+          <div class="buildings-grid" id="available-to-be-built"></div>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="rightpanel">
+
+    <!-- Player Profile -->
+    <table>
+      <tr><th colspan="2">Player Profile</th></tr>
+      <tr><td>Name</td><td>SKYY</td></tr>
+      <tr><td>Title</td><td>Lord</td></tr>
+      <tr><td>Prestige</td><td>123456</td></tr>
+      <tr><td>Honor</td><td>7890</td></tr>
+      <tr><td>Alliance</td><td>[Alliance]</td></tr>
+    </table>
+
+    <!-- City Stats -->
+    <table>
+      <tr><th colspan="2">City Stats</th></tr>
+      <tr><td>Tax Rate</td>
+        <td>
+          <div class="tax-control-inline">
+            <input type="number" id="tax-rate-input" min="0" max="100" value="30">%
+            <button onclick="submitTaxRate()">Set</button>
+          </div>
+        </td>
+      </tr>
+      <tr><td>Loyalty</td><td>100</td></tr>
+      <tr><td>Grievance</td><td>0</td></tr>
+    </table>
+
+    <!-- City Slots -->
+    <table>
+      <tr><th>City Building Slots</th></tr>
+      <tr>
+        <td>
+          <div id="slots"></div>
+        </td>
+      </tr>
+    </table>
+
+    <!-- City Selector -->
+    <table>
+      <tr><th colspan="2">City Selector</th></tr>
+      <tr><td>City 1</td><td>[Select]</td></tr>
+      <tr><td>City 2</td><td>[Select]</td></tr>
+      <tr><td>City 3</td><td>[Select]</td></tr>
+      <tr><td>City 4</td><td>[Select]</td></tr>
+      <tr><td>City 5</td><td>[Select]</td></tr>
+      <tr><td>City 6</td><td>[Select]</td></tr>
+      <tr><td>City 7</td><td>[Select]</td></tr>
+      <tr><td>City 8</td><td>[Select]</td></tr>
+      <tr><td>City 9</td><td>[Select]</td></tr>
+      <tr><td>City 10</td><td>[Select]</td></tr>
+    </table>
+
+    <!-- Timers & Construction Orders -->
+    <table>
+      <tr><th>Construction Queues & Timers</th></tr>
+      <tr>
+        <td>
+          <div id="queue"></div>
+        </td>
+      </tr>
+    </table>
+
+  </div>
+
+  <!-- CHAT -->
+  <div class="chat">
+    <table>
+      <tr><th colspan="3">Chat — World / Alliance / System</th></tr>
+      <tr>
+        <td style="width: 15%;">Channels</td>
+        <td style="width: 70%;">Messages</td>
+        <td style="width: 15%;">Input</td>
+      </tr>
+      <tr>
+        <td>
+          World<br>
+          Alliance<br>
+          Private<br>
+          System
+        </td>
+        <td>
+          (System): If you want to whisper to Mike, type:<br>
+          <code>Mike Hi Dude</code><br><br>
+          [Chat history...]
+        </td>
+        <td>
+          [Input Box]<br>
+          [Send Button]
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- BOTTOM BAR -->
+  <div class="bottombar">
+    <table>
+      <tr><th colspan="10">Bottom Action Bar</th></tr>
+      <tr>
+        <td>City</td>
+        <td>Map</td>
+        <td>Army</td>
+        <td>Quest</td>
+        <td>Reports</td>
+        <td>Mail</td>
+        <td>Alliance</td>
+        <td>Shop</td>
+        <td>Settings</td>
+        <td>Help</td>
+      </tr>
+      <tr>
+        <td>[Btn]</td><td>[Btn]</td><td>[Btn]</td><td>[Btn]</td>
+        <td>[Btn]</td><td>[Btn]</td><td>[Btn]</td><td>[Btn]</td>
+        <td>[Btn]</td><td>[Btn]</td>
+      </tr>
+    </table>
+  </div>
+
+</div>
+
+<!-- ERROR / REJECTION MODAL -->
+<div class="modal-overlay" id="modal-overlay" onclick="hideErrorModal(event)">
+  <div class="modal-panel" onclick="event.stopPropagation()">
+    <div class="modal-title">Order Rejected</div>
+    <div class="modal-message" id="modal-message"></div>
+    <button class="btn-build" style="width: auto; padding: 4px 16px;" onclick="hideErrorModal()">Dismiss</button>
+  </div>
+</div>
+
+<script>
+const CITY_ID = 1;
+const RESOURCE_KEYS = ["food", "wood", "stone", "iron", "gold", "workers"];
+
+let latestQueue = [];
+let taxInputTouched = false;
+
+function formatNumber(n) {
+  n = Number(n);
+  return n.toLocaleString("en-US");
+}
+
+function formatDuration(ms) {
+  if (ms <= 0) return "arriving";
+  const totalSeconds = Math.floor(ms / 1000);
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  const pad = (v) => String(v).padStart(2, "0");
+  return `${pad(h)}:${pad(m)}:${pad(s)}`;
+}
+
+function showErrorModal(message) {
+  document.getElementById("modal-message").textContent = message;
+  document.getElementById("modal-overlay").classList.add("visible");
+}
+
+function hideErrorModal(event) {
+  document.getElementById("modal-overlay").classList.remove("visible");
+}
+
+async function submitTaxRate() {
+  const input = document.getElementById("tax-rate-input");
+  const value = Math.min(100, Math.max(0, Number(input.value) || 0));
+
+  try {
+    const res = await fetch(`/cities/${CITY_ID}/taxRate`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taxRate: value })
+    });
+    const result = await res.json();
+
+    if (res.ok) {
+      refresh();
+    } else {
+      showErrorModal(result.error || "Failed to set tax rate");
+    }
+  } catch (err) {
+    console.error("Failed to set tax rate:", err);
+    showErrorModal("Could not reach the server. Check your connection and try again.");
+  }
+}
+
+function populationCellHTML(resources) {
+  const base = resources.basePopulation ?? "—";
+  const cottages = resources.cottagesPopulation ?? "—";
+  const total = resources.population ?? "—";
+  const workers = resources.workers ?? "—";
+  return `
+    <div class="pop-row"><span>Base:</span><strong>${formatNumber(base)}</strong></div>
+    <div class="pop-row"><span>Cottages:</span><strong>${formatNumber(cottages)}</strong></div>
+    <div class="pop-row"><span>Total:</span><strong>${formatNumber(total)}</strong></div>
+    <div class="pop-row"><span>Workers:</span><strong>${formatNumber(workers)}</strong></div>
+  `;
+}
+
+function renderTicker(resources) {
+  RESOURCE_KEYS.forEach(key => {
+    const el = document.getElementById(`res-${key}`);
+    if (el) el.textContent = formatNumber(resources[key]);
+  });
+
+  const popEl = document.getElementById("res-population");
+  if (popEl) {
+    popEl.innerHTML = populationCellHTML(resources);
+  }
+
+  if (!taxInputTouched) {
+    const taxInput = document.getElementById("tax-rate-input");
+    if (taxInput) taxInput.value = resources.tax_rate ?? 30;
+  }
+}
+
+function updateTicker(resources) {
+  RESOURCE_KEYS.forEach(key => {
+    const el = document.getElementById(`res-${key}`);
+    if (!el) return;
+    const newVal = formatNumber(resources[key]);
+    if (el.textContent !== newVal) {
+      el.textContent = newVal;
+      el.classList.add("tick");
+      setTimeout(() => el.classList.remove("tick"), 500);
+    }
+  });
+
+  const popEl = document.getElementById("res-population");
+  if (popEl) {
+    const html = populationCellHTML(resources);
+    if (popEl.innerHTML !== html) {
+      popEl.innerHTML = html;
+    }
+  }
+
+  if (!taxInputTouched) {
+    const taxInput = document.getElementById("tax-rate-input");
+    if (taxInput) taxInput.value = resources.tax_rate ?? 30;
+  }
+}
+
+function renderBuildings(buildings, isBusy) {
+  const el = document.getElementById("buildings");
+
+  if (!buildings || buildings.length === 0) {
+    el.innerHTML = `<div class="empty-note">No buildings constructed yet</div>`;
+    return;
+  }
+
+  el.innerHTML = buildings.map(b => `
+    <div class="building-card ${b.level === 0 ? "under-construction" : ""}">
+      <div>
+        <div class="b-name">${b.building_name}</div>
+        <div class="b-meta">
+          <span>${b.level === 0 ? "" : `<span class="b-level">Lv ${b.level}</span>`}</span>
+          <span class="b-tag ${b.level === 0 ? "building" : ""}">
+            ${b.level === 0 ? "Building" : (b.slot_pool || "fixed")}
+          </span>
+        </div>
+      </div>
+      <button class="btn-build" ${b.level === 0 || isBusy ? "disabled" : ""} onclick="startBuildingAction('upgrade', ${b.building_type_id})">
+        ${b.level === 0 ? "In Progress" : "Upgrade"}
+      </button>
+    </div>
+  `).join("");
+}
+
+function renderAvailableToBeBuilt(availableList, isBusy) {
+  const el = document.getElementById("available-to-be-built");
+
+  if (!availableList || availableList.length === 0) {
+    el.innerHTML = `<div class="empty-note">No buildings available at current Town Hall level</div>`;
+    return;
+  }
+
+  el.innerHTML = availableList.map(b => `
+    <div class="building-card">
+      <div>
+        <div class="b-name">${b.name}</div>
+        <div class="b-meta">
+          <span class="b-level">Lv 1</span>
+          <span class="b-tag">${b.slot_pool || "fixed"}</span>
+        </div>
+      </div>
+      <button class="btn-build" ${isBusy ? "disabled" : ""} onclick="startBuildingAction('construct', ${b.id})">
+        Build
+      </button>
+    </div>
+  `).join("");
+}
+
+function renderSlots(slots) {
+  const el = document.getElementById("slots");
+  if (!slots) return;
+
+  const block = (label, data) => {
+    if (!data) return '';
+    const pct = data.total > 0 ? Math.round((data.used / data.total) * 100) : 0;
+    const full = data.available <= 0;
+    return `
+      <div class="slot-block">
+        <div class="slot-head">
+          <span>${label}</span>
+          <strong>${data.used} / ${data.total}</strong>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill ${full ? "full" : ""}" style="width:${pct}%"></div>
+        </div>
+      </div>
+    `;
+  };
+
+  el.innerHTML = block("Inner City", slots.inner) + block("Outer Fields", slots.outer);
+}
+
+function renderQueue(queue) {
+  latestQueue = queue;
+  const el = document.getElementById("queue");
+
+  if (!queue || queue.length === 0) {
+    el.innerHTML = `<div class="empty-note">No active construction orders</div>`;
+    return;
+  }
+
+  el.innerHTML = queue.map(item => `
+    <div class="ticket" data-finish="${item.finish_time}">
+      <div class="seal" data-countdown>--:--:--</div>
+      <div class="ticket-body">
+        <div class="ticket-name">${item.building_name} → Lv ${item.target_level}</div>
+        <div class="ticket-sub">Order Dispatched</div>
+      </div>
+    </div>
+  `).join("");
+}
+
+function tickCountdowns() {
+  document.querySelectorAll("[data-finish]").forEach(ticket => {
+    const finish = new Date(ticket.getAttribute("data-finish")).getTime();
+    const remaining = finish - Date.now();
+    const seal = ticket.querySelector("[data-countdown]");
+    if (seal) seal.textContent = formatDuration(remaining);
+  });
+}
+
+async function startBuildingAction(actionType, buildingTypeId) {
+  const endpoint = actionType === 'construct'
+    ? '/buildings/construct'
+    : '/buildings/upgrade';
+
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cityId: CITY_ID, buildingTypeId })
+    });
+
+    const result = await res.json();
+    if (res.ok) {
+      refresh();
+    } else {
+      showErrorModal(result.error || result.message || "Failed to start construction");
+    }
+  } catch (err) {
+    console.error("Failed to post build action:", err);
+    showErrorModal("Could not reach the server. Check your connection and try again.");
+  }
+}
+
+async function refresh() {
+  try {
+    const res = await fetch(`/cities/${CITY_ID}`);
+    const data = await res.json();
+
+    const nameEl = document.getElementById("city-name");
+    if (nameEl) nameEl.textContent = data.city.name;
+
+    const metaEl = document.getElementById("city-meta");
+    if (metaEl) {
+      metaEl.textContent = `(${data.city.x}, ${data.city.y}) · Founded ${new Date(data.city.created_at).toLocaleDateString()}`;
+    }
+
+    if (data.resources) {
+      updateTicker(data.resources);
+    }
+
+    const isBusy = (data.queue || []).length > 0;
+
+    renderBuildings(data.buildings || [], isBusy);
+    renderAvailableToBeBuilt(data.availableBuildings || [], isBusy);
+    renderSlots(data.slots);
+    renderQueue(data.queue || []);
+    tickCountdowns();
+
+  } catch (err) {
+    const metaEl = document.getElementById("city-meta");
+    if (metaEl) metaEl.textContent = "Connection lost — retrying…";
+    console.error("Refresh error:", err);
+  }
+}
+
+document.getElementById("tax-rate-input")?.addEventListener("focus", () => {
+  taxInputTouched = true;
+});
+
+// Initial boot
+refresh();
+setInterval(refresh, 5000);
+setInterval(tickCountdowns, 1000);
+</script>
+
+</body>
+</html>

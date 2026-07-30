@@ -1,0 +1,193 @@
+ Volume XIV — Server Logic & Deterministic Simulation Engine, building directly on your database mapping (Volume XII), API endpoints (Volume XIII), and dependency/quest graphs (Volumes X & XI).📘 Volume XIV — Server Logic & Simulation EngineTick Mechanics • Queue Management • Combat Determinism • March Lifecycle • Transaction Safety1. Core PrinciplesState Machine Integrity: The database is the absolute single source of truth. The server logic functions as a deterministic state machine processing incoming requests and tick cycles.Time-Delta Calculation (Lazy Evaluation): To avoid running thousands of loop cycles for idle entities, resource accumulation and queue completions are calculated lazily on-demand upon the next interaction, backed by scheduled background system ticks for global events.Atomic Transactions & Lock Ordering: Race conditions (e.g., spending the same resource twice across rapid API calls) are mitigated using strict database row locking (SELECT FOR UPDATE) and predictable lock hierarchies (e.g., lock Player $\rightarrow$ lock City $\rightarrow$ lock Target).Pure Functional Combat Resolution: Battle processing is isolated from state I/O. Combat logic takes an immutable snapshot of armies, hero stats, and tech levels, runs a deterministic step-by-step battle loop, and produces a final state transition payload to commit in a single database transaction.2. Global Tick Engine & Queue SchedulerThe game runtime balances asynchronous events with periodic game ticks. Timed events (building completion, research, unit training) rely on an in-memory priority queue backed by persistent database storage.
+                  +-----------------------------------+
+                  |      Time-based Event Trigger     |
+                  |   (Scheduled Job / API Interaction)|
+                  +-----------------------------------+
+                                    |
+                                    v
+                  +-----------------------------------+
+                  |  1. Fetch Lazy State & DB Lock    |
+                  |     (Cities, Resources, Queues)   |
+                  +-----------------------------------+
+                                    |
+                                    v
+                  +-----------------------------------+
+                  |  2. Calculate Time Delta (Δt)     |
+                  |     Accumulate Resources/Upkeep   |
+                  +-----------------------------------+
+                                    |
+                                    v
+                  +-----------------------------------+
+                  |  3. Process Completed Queue Tasks |
+                  |     (Buildings, Tech, Training)   |
+                  +-----------------------------------+
+                                    |
+                                    v
+                  +-----------------------------------+
+                  |  4. Fire Quest Observer Events    |
+                  |     Update DB & Push WS Delta     |
+                  +-----------------------------------+
+Lazy Resource Ticking AlgorithmWhen a client queries or mutates a city, the resource tick engine evaluates the time elapsed ($\Delta t$) since last_tick_at.Algorithm CalculateCityResources(city_id):
+    BEGIN TRANSACTION
+    SELECT * FROM resources WHERE city_id = city_id FOR UPDATE;
+    SELECT * FROM population WHERE city_id = city_id;
+    SELECT * FROM warehouse WHERE city_id = city_id;
+
+    now = CurrentTimestamp()
+    delta_seconds = now - resources.last_tick_at
+
+    IF delta_seconds <= 0 THEN
+        RETURN resources
+    END IF
+
+    -- Calculate net hourly rates
+    production = GetBaseProduction(city_id) * GetMayorBonus(city_id) * GetTechBonus(city_id)
+    upkeep = GetTroopUpkeep(city_id) -- Consumes Food
+
+    hourly_net_food = production.food - upkeep.food
+
+    -- Compute updated resource counts bounded by warehouse caps
+    new_food = Clamp(resources.food + (hourly_net_food * (delta_seconds / 3600)), 0, warehouse.cap_food)
+    new_lumber = Clamp(resources.lumber + (production.lumber * (delta_seconds / 3600)), 0, warehouse.cap_lumber)
+    new_stone = Clamp(resources.stone + (production.stone * (delta_seconds / 3600)), 0, warehouse.cap_stone)
+    new_iron = Clamp(resources.iron + (production.iron * (delta_seconds / 3600)), 0, warehouse.cap_iron)
+    new_gold = Clamp(resources.gold + (production.gold * (delta_seconds / 3600)), 0, warehouse.cap_gold)
+
+    -- Update Database
+    UPDATE resources SET 
+        food = new_food, lumber = new_lumber, stone = new_stone, 
+        iron = new_iron, gold = new_gold, last_tick_at = now 
+    WHERE city_id = city_id;
+
+    COMMIT TRANSACTION
+    RETURN updated_resources
+3. Queue Resolution & Dependency ValidationEvery building, research, or unit queued must run validation against the dependencies graph before entering the execution pipeline.Algorithm QueueAction(player_id, city_id, action_type, target_type, target_level):
+    BEGIN TRANSACTION
+
+    -- 1. Validate Dependency Graph (Volume X Integration)
+    required_deps = SELECT * FROM dependencies 
+                    WHERE to_type = action_type AND to_id = target_type;
+
+    FOR EACH dep IN required_deps DO
+        IF NOT ValidatePlayerHasDependency(player_id, city_id, dep) THEN
+            ROLLBACK
+            RETURN Error("PREREQUISITE_FAILED", dep)
+        END IF
+    END FOR
+
+    -- 2. Deduct Resource Costs
+    costs = CalculateCost(target_type, target_level)
+    IF NOT HasSufficientResources(city_id, costs) THEN
+        ROLLBACK
+        RETURN Error("INSUFFICIENT_RESOURCES")
+    END IF
+    DeductResources(city_id, costs)
+
+    -- 3. Compute Duration and Queue Entry
+    base_time = GetBaseTime(target_type, target_level)
+    hero_speed_bonus = GetMayorPoliticsBonus(city_id)
+    tech_speed_bonus = GetResearchBonus(player_id, "Construction")
+    
+    final_duration = base_time / (1 + hero_speed_bonus + tech_speed_bonus)
+    now = CurrentTimestamp()
+    finishes_at = now + final_duration
+
+    -- 4. Persist to DB Queue
+    INSERT INTO building_queue (city_id, building_type, level, started_at, finishes_at)
+    VALUES (city_id, target_type, target_level, now, finishes_at);
+
+    COMMIT TRANSACTION
+    NotifyObserver("QUEUE_STARTED", { player_id, target_type, finishes_at })
+4. March Lifecycle & World Engine LogicMarches represent physical units traversing the coordinate grid between $(x_1, y_1)$ and $(x_2, y_2)$. The server manages the full state machine transition: MARCHING $\rightarrow$ COMBAT/RESOLVE $\rightarrow$ RETURNING $\rightarrow$ COMPLETED.                    +-------------------+
+                    |   POST /attack    |
+                    +-------------------+
+                              |
+                              v
+                    +-------------------+
+                    |      MARCHING     |
+                    +-------------------+
+                              |
+                              | (arrive_at reached)
+                              v
+                    +-------------------+
+                    |  RESOLVE COMBAT   |
+                    +-------------------+
+                              |
+                     +--------+--------+
+                     |                 |
+             (Has surviving)    (All units wiped)
+                 units                 |
+                     |                 v
+                     v         +---------------+
+             +---------------+ | MARCH_DELETED |
+             |   RETURNING   | +---------------+
+             +---------------+
+                     |
+                     | (return_at reached)
+                     v
+             +---------------+
+             | UNITS_RESTORED|
+             +---------------+
+March Speed & Arrival CalculationMarch travel time depends on the slowest unit type in the army, map distance, and speed buffs.$$\text{Distance} = \sqrt{(x_2 - x_1)^2 + (y_2 - y_1)^2}$$$$\text{Speed} = \min_{u \in \text{Army}}(\text{BaseSpeed}_u) \times (1 + \text{TechBonus}_{\text{Compass}})$$$$\text{TravelTimeSeconds} = \left( \frac{\text{Distance}}{\text{Speed}} \right) \times 3600$$5. Deterministic Combat Resolution LogicBattle simulation executes synchronously when a march arrives at target coordinates. combat takes place across sequential Rounds (up to a max of 100 rounds) at distinct engagement ranges.Combat Phase LoopJavaScript/**
+ * Deterministic Combat Resolver
+ * Pure function: Takes attacker/defender snapshots, outputs report & remaining troops
+ */
+function resolveCombat(attackerSnapshot, defenderSnapshot, maxRounds = 100) {
+  let distance = Math.max(attackerSnapshot.maxRange, defenderSnapshot.maxRange) + 1400;
+  
+  let attackerUnits = { ...attackerSnapshot.units };
+  let defenderUnits = { ...defenderSnapshot.units };
+
+  let roundLogs = [];
+
+  for (let round = 1; round <= maxRounds; round++) {
+    // 1. Check Win/Loss Conditions
+    if (getTotalCount(attackerUnits) === 0) break;
+    if (getTotalCount(defenderUnits) === 0) break;
+
+    // 2. Unit Movement Phase (Close distance)
+    distance = advanceUnitsAndGetNewDistance(distance, attackerUnits, defenderUnits);
+
+    // 3. Target Selection & Attack Calculation
+    let attackerDamage = calculateDamagePool(attackerUnits, attackerSnapshot.hero, defenderUnits, distance);
+    let defenderDamage = calculateDamagePool(defenderUnits, defenderSnapshot.hero, attackerUnits, distance);
+
+    // 4. Apply Casualties Simultaneously
+    attackerUnits = applyLosses(attackerUnits, defenderDamage);
+    defenderUnits = applyLosses(defenderUnits, attackerDamage);
+
+    roundLogs.push({ round, distance, attackerUnits: { ...attackerUnits }, defenderUnits: { ...defenderUnits } });
+  }
+
+  const winner = getTotalCount(attackerUnits) > 0 ? "ATTACKER" : "DEFENDER";
+  
+  return {
+    winner,
+    survivingAttackerUnits: attackerUnits,
+    survivingDefenderUnits: defenderUnits,
+    roundLogs
+  };
+}
+6. End-to-End Execution Sequence MapThe following dynamic sequence details a complete user-driven lifecycle: submitting a training command, processing the queue, auto-triggering quest state observers, and propagating WebSocket payloads to the frontend.User / Client         API Layer (Vol XIII)       Server / DB (Vol XII)     Quest Engine (Vol XI)      WebSocket / Push
+     |                         |                           |                         |                         |
+     |--- POST /cities/1/train ->|                         |                         |                         |
+     |    { Archer, 1000 }     |                           |                         |                         |
+     |                         |--- Acquire DB Lock ------>|                         |                         |
+     |                         |    Deduct Resources       |                         |                         |
+     |                         |    Insert Training Queue  |                         |                         |
+     |                         |<-- Queue Task Created ----|                         |                         |
+     |<-- 200 OK (Task Payload)-|                           |                         |                         |
+     |                         |                           |                         |                         |
+     |                         |    [Time Passes / Tick]   |                         |                         |
+     |                         |    Task Reaches Expiry    |                         |                         |
+     |                         |--- Process Queue Completion->                       |                         |
+     |                         |    Add Units to City      |                         |                         |
+     |                         |                           |--- Notify Action ------>|                         |
+     |                         |                           |    ('train', 'Archer')  |                         |
+     |                         |                           |                         |--- Update Quest Progress|
+     |                         |                           |                         |    Mark 'CLAIMABLE'     |
+     |                         |                           |<-- Quest Updated -------|                         |
+     |                         |                           |                         |                         |
+     |                         |=========================== Broadcast State Delta ============================>|
+     |<--------------------------------------------------------------------------------------------------------|
+     |                                                                                                         |

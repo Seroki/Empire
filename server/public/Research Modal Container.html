@@ -1,0 +1,194 @@
+<!-- Research Modal Container -->
+<div id="research-modal" class="modal-overlay hidden">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>Academy Research Tree</h2>
+      <button class="close-btn" onclick="closeResearchGui()">&times;</button>
+    </div>
+
+    <!-- Discipline Tabs -->
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchDiscipline('economy')">Economy</button>
+      <button class="tab-btn" onclick="switchDiscipline('military')">Military</button>
+      <button class="tab-btn" onclick="switchDiscipline('logistics')">Logistics</button>
+    </div>
+
+    <!-- Tech Grid -->
+    <div id="tech-container" class="tech-grid"></div>
+  </div>
+</div>
+
+<!-- Alert / Requirements Pop-up -->
+<div id="alert-popup" class="popup-overlay hidden">
+  <div class="popup-box">
+    <h3 id="popup-title">Requirements Not Met</h3>
+    <p id="popup-message"></p>
+    <button onclick="closePopup()">OK</button>
+  </div>
+</div>
+
+<style>
+  .hidden { display: none !important; }
+  .modal-overlay, .popup-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.7); display: flex; align-items: center; justify-content: center;
+  }
+  .modal-content { background: #222; color: #fff; width: 800px; padding: 20px; border-radius: 8px; }
+  .modal-header { display: flex; justify-content: space-between; align-items: center; }
+  .tab-bar { display: flex; gap: 10px; margin: 15px 0; border-bottom: 1px solid #444; }
+  .tab-btn { background: none; border: none; color: #aaa; padding: 10px 15px; cursor: pointer; font-size: 16px; }
+  .tab-btn.active { color: #fff; border-bottom: 2px solid #e2b041; font-weight: bold; }
+  .tech-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; max-height: 400px; overflow-y: auto; }
+  
+  .tech-card { background: #333; padding: 15px; border-radius: 6px; border: 1px solid #444; }
+  .tech-card.locked { opacity: 0.6; }
+  .cost-list { font-size: 0.85em; color: #ccc; margin: 8px 0; }
+  .research-btn { background: #e2b041; color: #111; border: none; padding: 8px 12px; font-weight: bold; cursor: pointer; width: 100%; border-radius: 4px; }
+  .research-btn:hover { background: #d4a030; }
+
+  .popup-box { background: #2a1a1a; border: 1px solid #ff4d4d; color: #fff; padding: 20px; border-radius: 6px; text-align: center; max-width: 350px; }
+  .popup-box button { margin-top: 15px; padding: 6px 20px; background: #ff4d4d; border: none; color: white; cursor: pointer; }
+</style>
+
+<script>
+let currentCityId = 1;
+let researchData = null;
+let currentDiscipline = 'economy';
+
+// 1. Fetch data from backend
+async function openResearchGui(cityId = 1) {
+  currentCityId = cityId;
+  document.getElementById('research-modal').classList.remove('hidden');
+
+  try {
+    const res = await fetch(`/research?cityId=${cityId}`);
+    const data = await res.json();
+
+    if (!data.success) {
+      showRequirementPopup('Error', data.error || 'Failed to load research tree.');
+      return;
+    }
+
+    researchData = data;
+    renderTechs();
+  } catch (err) {
+    showRequirementPopup('Error', 'Could not connect to the server.');
+  }
+}
+
+function closeResearchGui() {
+  document.getElementById('research-modal').classList.add('hidden');
+}
+
+function switchDiscipline(discipline) {
+  currentDiscipline = discipline;
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+  event.target.classList.add('active');
+  renderTechs();
+}
+
+// 2. Render technologies by selected discipline
+function renderTechs() {
+  const container = document.getElementById('tech-container');
+  container.innerHTML = '';
+
+  if (!researchData || !researchData.technologies) return;
+
+  const academyLevel = researchData.academyLevel || 0;
+  const activeQueue = researchData.activeQueue;
+
+  Object.entries(researchData.technologies).forEach(([code, tech]) => {
+    // Filter discipline (assuming tech.discipline exists; defaults to economy if missing)
+    const discipline = tech.discipline || 'economy';
+    if (discipline !== currentDiscipline) return;
+
+    const targetLevel = tech.globalLevel + 1;
+    const reqAcademy = tech.requiredAcademyLevel || 1;
+    const isAcademyMet = academyLevel >= reqAcademy;
+
+    const card = document.createElement('div');
+    card.className = `tech-card ${!isAcademyMet ? 'locked' : ''}`;
+
+    card.innerHTML = `
+      <h3>${tech.name} <small>(Lvl ${tech.globalLevel})</small></h3>
+      <p>${tech.description || 'Enhances city capabilities.'}</p>
+      
+      <div class="cost-list">
+        <strong>Next Level (${targetLevel}) Cost:</strong><br/>
+        Food: ${tech.nextLevelCost.food} | Wood: ${tech.nextLevelCost.wood} | 
+        Stone: ${tech.nextLevelCost.stone} | Iron: ${tech.nextLevelCost.iron} | 
+        Gold: ${tech.nextLevelCost.gold}
+      </div>
+      <p><small>Requires Academy Level: ${reqAcademy}</small></p>
+
+      <button class="research-btn" onclick="attemptResearch('${code}', ${targetLevel}, ${reqAcademy})">
+        ${activeQueue?.tech_code === code ? 'Researching...' : 'Research'}
+      </button>
+    `;
+
+    container.appendChild(card);
+  });
+}
+
+// 3. Client Validation & Requirement Warning Pop-up
+function attemptResearch(techCode, targetLevel, requiredAcademyLevel) {
+  const academyLevel = researchData.academyLevel || 0;
+
+  // Check 1: Academy Level
+  if (academyLevel < requiredAcademyLevel) {
+    showRequirementPopup(
+      'Academy Level Too Low',
+      `You need an Academy Level ${requiredAcademyLevel} to research this tech. Your current Academy level is ${academyLevel}.`
+    );
+    return;
+  }
+
+  // Check 2: Active Queue
+  if (researchData.activeQueue) {
+    showRequirementPopup(
+      'Research Queue Busy',
+      `You are already researching ${researchData.activeQueue.tech_code}. Wait until it finishes or speed it up.`
+    );
+    return;
+  }
+
+  // If checks pass, call start endpoint
+  sendStartResearchRequest(techCode, targetLevel);
+}
+
+// 4. API call to start research
+async function sendStartResearchRequest(techCode, targetLevel) {
+  try {
+    const res = await fetch('/research/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cityId: currentCityId,
+        techCode: techCode,
+        targetLevel: targetLevel
+      })
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      showRequirementPopup('Research Failed', data.error);
+    } else {
+      openResearchGui(currentCityId); // Refresh tree UI
+    }
+  } catch (err) {
+    showRequirementPopup('Error', 'Failed to communicate with the server.');
+  }
+}
+
+// Pop-up handlers
+function showRequirementPopup(title, message) {
+  document.getElementById('popup-title').innerText = title;
+  document.getElementById('popup-message').innerText = message;
+  document.getElementById('alert-popup').classList.remove('hidden');
+}
+
+function closePopup() {
+  document.getElementById('alert-popup').classList.add('hidden');
+}
+</script>

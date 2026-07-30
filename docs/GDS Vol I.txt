@@ -1,0 +1,498 @@
+Volume I — Core Game
+Evony Age I Recreation Game Design Specification
+Document Metadata
+Attribute	Description
+Volume	I — Core Game
+Version	1.0 Draft
+Project	Evony Age I Recreation
+Purpose	Define the foundational gameplay systems, philosophy, progression model, and dependency framework
+Status	Core Design Reference
+Related Documents	Volume II — World Map
+	Volume III — Buildings & Construction
+	Volume IV — Resource Fields & Economy
+	Volume V — Technologies & Research
+	Volume VI — Military Units & Combat
+	Volume VII — Heroes & Items
+	Volume VIII — Alliances & Diplomacy
+	Volume IX — Quests & Events
+1. Introduction and Overview
+1.1 Genre
+
+Evony Age I is a massively multiplayer online real-time strategy (MMORTS) game originally designed for browser-based gameplay.
+
+The game combines:
+
+City construction and expansion
+Resource production and economic management
+Population growth and workforce allocation
+Technological advancement
+Military training and warfare
+Hero management
+Diplomacy and alliances
+Persistent world competition
+
+Players begin with a developing settlement and gradually transform it into a powerful city capable of supporting armies, research programs, and territorial expansion.
+
+The world exists continuously, allowing player decisions to progress over time regardless of whether the player is actively connected.
+
+1.2 High-Level Concept
+
+Players manage a civilization within a persistent medieval fantasy world.
+
+Success requires balancing:
+
+Economic growth
+Infrastructure development
+Research advancement
+Military capability
+Territory control
+Diplomatic relationships
+
+Every decision creates strategic consequences.
+
+A player focused entirely on military expansion may lack economic support.
+
+A player focused entirely on economy may become vulnerable.
+
+The core experience is balancing competing priorities over long periods of development.
+
+2. Design Philosophy
+
+The recreation follows these principles:
+
+2.1 Faithful Recreation
+
+The remake preserves the recognizable gameplay progression and strategic decisions that defined Evony Age I.
+
+Where original information is unavailable, mechanics are reconstructed using:
+
+Archived gameplay information
+Historical documentation
+Community knowledge
+Logical system consistency
+2.2 Data-Driven Design
+
+All gameplay rules exist as structured game data rather than being permanently embedded into code.
+
+Examples:
+
+Buildings define:
+
+Requirements
+Costs
+Upgrade paths
+Unlocks
+Dependencies
+
+Technologies define:
+
+Research requirements
+Benefits
+Prerequisites
+Advancement paths
+
+Units define:
+
+Training requirements
+Resource costs
+Combat statistics
+Technology dependencies
+
+The game engine interprets these rules.
+
+2.3 Dependency-Based Progression
+
+The entire game is built around interconnected dependency relationships.
+
+Examples:
+
+Town Hall Level
+↓
+Unlocks Building Slots
+↓
+Allows New Buildings
+↓
+Enables Research
+↓
+Unlocks Military Units
+↓
+Allows Advanced Strategies
+
+No major progression system exists independently.
+
+2.4 Fair Competition
+
+The recreation excludes:
+
+Pay-to-win mechanics
+Premium combat advantages
+Purchased progression shortcuts
+
+Player success is determined by:
+
+Planning
+Strategy
+Cooperation
+Time investment
+Decision-making
+2.5 Deterministic Rules and Controlled Randomness
+
+Core gameplay follows predictable rules.
+
+Examples:
+
+Construction times
+Resource production
+Research effects
+Unit statistics
+
+Where randomness exists, such as combat variations, it must be:
+
+Controlled
+Documented
+Balanced
+Reproducible
+
+Randomness should create strategic uncertainty, not unfair outcomes.
+
+2.6 Persistent Continuity
+
+The world continues evolving whether players are online or offline.
+
+Examples:
+
+Resources accumulate
+Construction completes
+Research finishes
+Troops march
+Events progress
+
+The player experiences a living world rather than a session-based game.
+
+3. Project Goals and Non-Goals
+3.1 Goals
+
+The recreation aims to:
+
+Reproduce the strategic feel of Evony Age I.
+Provide a persistent multiplayer world.
+Preserve recognizable progression systems.
+Create expandable gameplay architecture.
+Support long-term server operation.
+Maintain clear separation between rules and implementation.
+3.2 Non-Goals
+
+The project intentionally excludes:
+
+Pay-to-win mechanics
+Real-money advantages
+Advertisement systems
+Flash-based interface recreation
+Facebook/social integration
+Later Age II or Age III systems
+Original bugs or exploits
+4. Core Gameplay Pillars
+4.1 Economic Growth
+
+Resources provide the foundation of civilization.
+
+Players manage:
+
+Food
+Wood
+Stone
+Iron
+Gold
+
+Economy determines the ability to construct, research, and wage war.
+
+4.2 City Development
+
+Cities evolve through:
+
+Buildings
+Population growth
+Resource fields
+Infrastructure decisions
+
+Players must decide how limited space is used.
+
+4.3 Technological Advancement
+
+Research improves:
+
+Production
+Construction
+Military capability
+Logistics
+Civilization efficiency
+
+Technology progression depends on prerequisites.
+
+4.4 Military Power
+
+Armies allow:
+
+Defense
+Expansion
+Territory control
+Competition
+
+Military strength depends on economic support.
+
+4.5 Strategic Cooperation
+
+Alliances provide:
+
+Mutual defense
+Resource assistance
+Coordinated attacks
+Political influence
+4.6 Long-Term Progression
+
+Player choices create permanent strategic outcomes.
+
+Development occurs over:
+
+Days
+Weeks
+Months
+5. Core Terminology
+Term	Definition
+City	Player-controlled settlement containing buildings, population, and resources
+Player	Human participant controlling one or more cities
+Mayor	Assigned city administrator providing bonuses
+Hero	Special character providing military or administrative bonuses
+Building Slot	Location where structures can be constructed
+Inner City	Area containing administrative, military, and special buildings
+Outer City	Resource production area containing fields
+Resource Field	Production location for food, wood, stone, or iron
+Population	Citizens supporting production and military
+Worker	Population assigned to resource production
+March	Movement of troops across the world
+Valley	Strategic world location providing benefits
+NPC City	Computer-controlled settlement
+Tile	Coordinate location on the world map
+Alliance	Cooperative player organization
+Garrison	Defensive troops stationed in a city
+Reinforcement	Allied troops sent to assist
+Rally	Troop assembly location
+Construction Queue	Active building projects
+Research Queue	Active technology projects
+Technology Level	Advancement stage of research
+Building Level	Upgrade stage of a structure
+Occupation	Control status of a location
+Scout Report	Intelligence information
+6. Scope of Systems
+Included
+Cities
+Buildings
+Resource fields
+Population
+Economy
+Research
+Military
+Heroes
+Items
+NPC cities
+Alliances
+Diplomacy
+World map
+Valleys
+Quests
+Events
+Trading systems
+Excluded
+Monetization
+Pay advantages
+Social media integration
+Later Age expansions
+Deprecated technologies
+7. Persistence and Time Model
+
+Evony Age I operates as a persistent world.
+
+All timed activities use continuous elapsed time.
+
+Examples:
+
+Construction
+
+Building Start Time
+↓
+Construction Duration
+↓
+Completion Time
+
+Research
+
+Research Start
+↓
+Research Duration
+↓
+Technology Unlock
+
+Resource Production
+
+Resource Amount =
+(Current Production Rate × Elapsed Time)
+
+Players do not interact with visible game ticks.
+
+The world appears continuous.
+
+8. Core Gameplay Systems
+8.1 City Development
+
+Cities progress through:
+
+Town Hall upgrades
+Building construction
+Slot expansion
+Infrastructure specialization
+
+Town Hall progression controls:
+
+Building availability
+Maximum levels
+City expansion
+8.2 Resource Economy
+
+Primary resources:
+
+Resource	Purpose
+Food	Population and troop upkeep
+Wood	Construction and equipment
+Stone	Buildings and defenses
+Iron	Military production
+Gold	Research, taxation, advanced costs
+
+Production depends on:
+
+Resource fields
+Worker assignment
+Technology
+Buildings
+Bonuses
+8.3 Population System
+
+Population performs multiple roles:
+
+Workers:
+
+Produce resources
+Generate taxes
+
+Military:
+
+Become trained soldiers
+
+Population depends on:
+
+Housing
+Happiness
+Tax rates
+City development
+8.4 Research System
+
+Research occurs through the Academy.
+
+Technologies contain:
+
+Requirements
+Costs
+Research times
+Levels
+Effects
+
+Research dependencies form progression trees.
+
+8.5 Military System
+
+Military includes:
+
+Troop recruitment
+Training buildings
+Combat
+Defense
+Heroes
+Marches
+
+Combat depends on:
+
+Unit statistics
+Technology
+Heroes
+Terrain
+Fortifications
+8.6 Diplomacy and Alliances
+
+Alliance systems include:
+
+Cooperation
+Shared defense
+Resource assistance
+Coordinated warfare
+9. Victory and Defeat Conditions
+
+The game remains open-ended.
+
+Success may be measured through:
+
+Territorial dominance
+Rankings
+Alliance achievements
+Event victories
+Military reputation
+
+Defeat may occur through:
+
+Loss of cities
+Loss of territory
+Economic collapse
+Player inactivity
+10. Dependency Framework Overview
+
+All future volumes expand this dependency model.
+
+Town Hall
+    |
+    +-- Building Slots
+    |
+    +-- Resource Capacity
+    |
+    +-- Academy
+    |      |
+    |      +-- Technologies
+    |              |
+    |              +-- Advanced Buildings
+    |              |
+    |              +-- Military Units
+    |
+    +-- Barracks
+    |      |
+    |      +-- Troop Training
+    |
+    +-- Stable
+    |
+    +-- Workshop
+    |
+    +-- Marketplace
+
+Every system references dependency data.
+
+No progression exists as isolated content.
+
+11. Summary
+
+Volume I establishes the foundation of the Evony Age I Recreation.
+
+The game is defined as:
+
+A persistent MMORTS world
+Driven by economic development
+Controlled by dependency-based progression
+Expanded through modular systems
+Balanced through strategic choices
+
+Future volumes define the detailed databases, formulas, buildings, technologies, units, heroes, combat rules, and world systems built upon this foundation.

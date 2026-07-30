@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Empire Core — Command Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+  :root {
+    --ink: #14110d;
+    --panel: #1e1912;
+    --panel-raised: #241e15;
+    --line: #3d3020;
+    --brass: #c89b3c;
+    --brass-dim: #8a6e2c;
+    --green: #6b8f5a;
+    --rust: #a8462e;
+    --parchment: #eae0cb;
+    --faded: #8a7c63;
+
+    --font-display: 'Cinzel', serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ink);
+    background-image:
+      radial-gradient(ellipse at top, rgba(200,155,60,0.06), transparent 60%);
+    color: var(--parchment);
+    font-family: var(--font-mono);
+    min-height: 100vh;
+    padding: 2rem 1.25rem 4rem;
+  }
+
+  a { color: inherit; }
+
+  .wrap {
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  /* ---------- Header ---------- */
+
+  header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .eyebrow {
+    font-size: 0.7rem;
+    letter-spacing: 0.35em;
+    color: var(--brass-dim);
+    text-transform: uppercase;
+    margin-bottom: 0.6rem;
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: clamp(1.8rem, 4vw, 2.6rem);
+    letter-spacing: 0.06em;
+    margin: 0;
+    color: var(--brass);
+    text-shadow: 0 0 24px rgba(200,155,60,0.25);
+  }
+
+  .city-meta {
+    font-size: 0.75rem;
+    color: var(--faded);
+    margin-top: 0.5rem;
+    letter-spacing: 0.05em;
+  }
+
+  /* ---------- Resource ticker ---------- */
+
+  .ticker {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    margin-bottom: 2rem;
+  }
+
+  .ticker-cell {
+    background: var(--panel);
+    padding: 0.9rem 0.5rem;
+    text-align: center;
+  }
+
+  .ticker-label {
+    font-size: 0.62rem;
+    letter-spacing: 0.18em;
+    color: var(--faded);
+    text-transform: uppercase;
+    margin-bottom: 0.35rem;
+  }
+
+  .ticker-value {
+    font-size: clamp(0.95rem, 2vw, 1.25rem);
+    font-weight: 600;
+    color: var(--parchment);
+    transition: color 0.4s ease;
+  }
+
+  .ticker-value.tick {
+    color: var(--brass);
+  }
+
+  /* ---------- Section headings ---------- */
+
+  .section-title {
+    font-family: var(--font-display);
+    font-size: 0.95rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--brass);
+    margin: 0 0 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .section-title::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--line);
+  }
+
+  /* ---------- Layout ---------- */
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 2rem;
+  }
+
+  @media (max-width: 800px) {
+    .grid { grid-template-columns: 1fr; }
+    .ticker { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  section { margin-bottom: 2.2rem; }
+
+  /* ---------- Buildings ---------- */
+
+  .buildings {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 0.6rem;
+  }
+
+  .building-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    padding: 0.75rem 0.85rem;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  .building-card.under-construction {
+    border-color: var(--rust);
+    animation: pulse-rust 2.4s ease-in-out infinite;
+  }
+
+  @keyframes pulse-rust {
+    0%, 100% { border-color: var(--rust); }
+    50% { border-color: rgba(168,70,46,0.35); }
+  }
+
+  .b-name {
+    font-size: 0.82rem;
+    color: var(--parchment);
+    margin-bottom: 0.3rem;
+  }
+
+  .b-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.68rem;
+    color: var(--faded);
+    letter-spacing: 0.04em;
+    margin-bottom: 0.4rem;
+  }
+
+  .b-level {
+    color: var(--brass);
+    font-weight: 600;
+  }
+
+  .b-tag {
+    text-transform: uppercase;
+    font-size: 0.6rem;
+    letter-spacing: 0.08em;
+  }
+
+  .b-tag.building {
+    color: var(--rust);
+  }
+
+  /* ---------- Actions ---------- */
+
+  .btn-build {
+    background: var(--panel-raised);
+    border: 1px solid var(--brass-dim);
+    color: var(--brass);
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 0.3rem 0.5rem;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 0.3rem;
+  }
+
+  .btn-build:hover:not(:disabled) {
+    background: var(--brass);
+    color: var(--ink);
+  }
+
+  .btn-build:disabled {
+    border-color: var(--line);
+    color: var(--faded);
+    cursor: not-allowed;
+    background: transparent;
+  }
+
+  /* ---------- Slots ---------- */
+
+  .slot-block {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    padding: 0.9rem 1rem;
+    margin-bottom: 0.6rem;
+  }
+
+  .slot-head {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    color: var(--faded);
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+
+  .slot-head strong {
+    color: var(--parchment);
+    font-weight: 600;
+  }
+
+  .bar-track {
+    height: 8px;
+    background: var(--ink);
+    border: 1px solid var(--line);
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--brass-dim), var(--brass));
+    transition: width 0.6s ease;
+  }
+
+  .bar-fill.full {
+    background: linear-gradient(90deg, #7a2e1c, var(--rust));
+  }
+
+  /* ---------- Construction queue: dispatch tickets ---------- */
+
+  .ticket {
+    background: var(--panel-raised);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--brass);
+    padding: 0.75rem 0.9rem;
+    margin-bottom: 0.6rem;
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+  }
+
+  .seal {
+    flex-shrink: 0;
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    border: 2px solid var(--brass);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: var(--brass);
+    text-align: center;
+    line-height: 1.1;
+    letter-spacing: 0.02em;
+  }
+
+  .ticket-body { flex: 1; min-width: 0; }
+
+  .ticket-name {
+    font-size: 0.8rem;
+    color: var(--parchment);
+    margin-bottom: 0.15rem;
+  }
+
+  .ticket-sub {
+    font-size: 0.65rem;
+    color: var(--faded);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .empty-note {
+    font-size: 0.75rem;
+    color: var(--faded);
+    padding: 0.9rem;
+    border: 1px dashed var(--line);
+    text-align: center;
+  }
+
+  footer {
+    text-align: center;
+    margin-top: 3rem;
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    color: var(--faded);
+    text-transform: uppercase;
+  }
+
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Empire Core</div>
+    <h1 id="city-name">—</h1>
+    <div class="city-meta" id="city-meta">Loading dispatch…</div>
+  </header>
+
+  <div class="ticker" id="ticker"></div>
+
+  <div class="grid">
+
+    <div>
+      <section>
+        <div class="section-title">Buildings</div>
+        <div class="buildings" id="buildings"></div>
+      </section>
+
+      <section>
+        <div class="section-title">Available to be built</div>
+        <div class="buildings" id="available-to-be-built"></div>
+      </section>
+    </div>
+
+    <div>
+      <section>
+        <div class="section-title">City Slots</div>
+        <div id="slots"></div>
+      </section>
+
+      <section>
+        <div class="section-title">Construction Orders</div>
+        <div id="queue"></div>
+      </section>
+    </div>
+
+  </div>
+
+  <footer>Auto-updating every 5 seconds</footer>
+
+</div>
+
+<script>
+
+const CITY_ID = 1;
+const RESOURCE_KEYS = ["food", "wood", "stone", "iron", "gold", "workers"];
+
+let latestQueue = [];
+
+function formatNumber(n) {
+  n = Number(n);
+  return n.toLocaleString("en-US");
+}
+
+function formatDuration(ms) {
+  if (ms <= 0) return "arriving";
+  const totalSeconds = Math.floor(ms / 1000);
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  const pad = (v) => String(v).padStart(2, "0");
+  return `${pad(h)}:${pad(m)}:${pad(s)}`;
+}
+
+function renderTicker(resources) {
+  const ticker = document.getElementById("ticker");
+  ticker.innerHTML = RESOURCE_KEYS.map(key => `
+    <div class="ticker-cell">
+      <div class="ticker-label">${key}</div>
+      <div class="ticker-value" id="res-${key}">${formatNumber(resources[key])}</div>
+    </div>
+  `).join("");
+}
+
+function updateTicker(resources) {
+  RESOURCE_KEYS.forEach(key => {
+    const el = document.getElementById(`res-${key}`);
+    if (!el) return;
+    const newVal = formatNumber(resources[key]);
+    if (el.textContent !== newVal) {
+      el.textContent = newVal;
+      el.classList.add("tick");
+      setTimeout(() => el.classList.remove("tick"), 500);
+    }
+  });
+}
+
+function renderBuildings(buildings, isBusy) {
+  const el = document.getElementById("buildings");
+
+  if (buildings.length === 0) {
+    el.innerHTML = `<div class="empty-note">No buildings yet</div>`;
+    return;
+  }
+
+  el.innerHTML = buildings.map(b => `
+    <div class="building-card ${b.level === 0 ? "under-construction" : ""}">
+      <div>
+        <div class="b-name">${b.building_name}</div>
+        <div class="b-meta">
+          <span>${b.level === 0 ? "" : `<span class="b-level">Lv ${b.level}</span>`}</span>
+          <span class="b-tag ${b.level === 0 ? "building" : ""}">
+            ${b.level === 0 ? "Building" : (b.slot_pool || "fixed")}
+          </span>
+        </div>
+      </div>
+      <button class="btn-build" ${b.level === 0 || isBusy ? "disabled" : ""} onclick="startBuildingAction('upgrade', ${b.building_type_id})">
+        ${b.level === 0 ? "In Progress" : "Upgrade"}
+      </button>
+    </div>
+  `).join("");
+}
+
+function renderAvailableToBeBuilt(availableList, isBusy) {
+  const el = document.getElementById("available-to-be-built");
+
+  if (!availableList || availableList.length === 0) {
+    el.innerHTML = `<div class="empty-note">No buildings available at current Town Hall level</div>`;
+    return;
+  }
+
+  el.innerHTML = availableList.map(b => `
+    <div class="building-card">
+      <div>
+        <div class="b-name">${b.name}</div>
+        <div class="b-meta">
+          <span class="b-level">Lv 1</span>
+          <span class="b-tag">${b.slot_pool || "fixed"}</span>
+        </div>
+      </div>
+      <button class="btn-build" ${isBusy ? "disabled" : ""} onclick="startBuildingAction('construct', ${b.id})">
+        Build
+      </button>
+    </div>
+  `).join("");
+}
+
+function renderSlots(slots) {
+  const el = document.getElementById("slots");
+
+  const block = (label, data) => {
+    const pct = data.total > 0 ? Math.round((data.used / data.total) * 100) : 0;
+    const full = data.available <= 0;
+    return `
+      <div class="slot-block">
+        <div class="slot-head">
+          <span>${label}</span>
+          <strong>${data.used} / ${data.total}</strong>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill ${full ? "full" : ""}" style="width:${pct}%"></div>
+        </div>
+      </div>
+    `;
+  };
+
+  el.innerHTML = block("Inner City", slots.inner) + block("Outer Fields", slots.outer);
+}
+
+function renderQueue(queue) {
+  latestQueue = queue;
+  const el = document.getElementById("queue");
+
+  if (queue.length === 0) {
+    el.innerHTML = `<div class="empty-note">No active orders</div>`;
+    return;
+  }
+
+  el.innerHTML = queue.map(item => `
+    <div class="ticket" data-finish="${item.finish_time}">
+      <div class="seal" data-countdown>--:--:--</div>
+      <div class="ticket-body">
+        <div class="ticket-name">${item.building_name} → Lv ${item.target_level}</div>
+        <div class="ticket-sub">Order dispatched</div>
+      </div>
+    </div>
+  `).join("");
+}
+
+function tickCountdowns() {
+  document.querySelectorAll("[data-finish]").forEach(ticket => {
+    const finish = new Date(ticket.getAttribute("data-finish")).getTime();
+    const remaining = finish - Date.now();
+    const seal = ticket.querySelector("[data-countdown]");
+    if (seal) seal.textContent = formatDuration(remaining);
+  });
+}
+
+// ⭐ FIXED ENDPOINTS — these now match your Express mount paths
+async function startBuildingAction(actionType, buildingTypeId) {
+  const endpoint = actionType === 'construct'
+    ? '/buildings/construct'
+    : '/buildings/upgrade';
+
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cityId: CITY_ID, buildingTypeId })
+    });
+    
+    const result = await res.json();
+    if (res.ok) {
+      refresh();
+    } else {
+      alert(result.error || result.message || "Failed to start construction");
+    }
+  } catch (err) {
+    console.error("Failed to post build action:", err);
+  }
+}
+
+async function refresh() {
+  try {
+    const res = await fetch(`/cities/${CITY_ID}`);
+    const data = await res.json();
+
+    document.getElementById("city-name").textContent = data.city.name;
+    document.getElementById("city-meta").textContent =
+      `Coordinates ${data.city.x}, ${data.city.y} · Founded ${new Date(data.city.created_at).toLocaleDateString()}`;
+
+    if (!document.getElementById("res-food")) {
+      renderTicker(data.resources);
+    } else {
+      updateTicker(data.resources);
+    }
+
+    const isBusy = (data.queue || []).length > 0;
+
+    renderBuildings(data.buildings, isBusy);
+    renderAvailableToBeBuilt(data.availableBuildings || [], isBusy);
+    renderSlots(data.slots);
+    renderQueue(data.queue || []);
+    tickCountdowns();
+
+  } catch (err) {
+    document.getElementById("city-meta").textContent = "Connection lost — retrying…";
+    console.error(err);
+  }
+}
+
+refresh();
+setInterval(refresh, 5000);
+setInterval(tickCountdowns, 1000);
+
+</script>
+
+
+</body>
+</html>

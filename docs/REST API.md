@@ -1,0 +1,623 @@
+GDS Volume XIII — REST API Specification & OpenAPI 3.0 Schema Definition for the Evony Age I game engine.
+
+This specification normalizes all resource mutations into strict JSON payloads, maps real-time resource ticks, validates preconditions against game state dependency graphs (Volume X & XI), and structures WebSocket/SSE events for state pushes.
+API Architecture & Pipeline Overview
+
+                      +-----------------------------------+
+                      |   Client Request (HTTP REST/WS)   |
+                      +-----------------------------------+
+                                        |
+                                        v
+                      +-----------------------------------+
+                      | JWT Bearer & Rate-Limiter Guard  |
+                      +-----------------------------------+
+                                        |
+                                        v
+                      +-----------------------------------+
+                      |   Dependency Engine Check (Vol X) |
+                      |   (Buildings, Tech, Title, Gold)  |
+                      +-----------------------------------+
+                                        |
+                      +-----------------+-----------------+
+                      |                                   |
+             Valid Preconditions                   Validation Failure
+                      |                                   |
+                      v                                   v
+       +----------------------------+           +-------------------+
+       | DB Transaction / Mutator   |           | HTTP 400/409/422  |
+       +----------------------------+           | Error Envelope    |
+                      |                         +-------------------+
+                      v
+       +----------------------------+
+       |   Observer Event Bus       |
+       |  (Quest Checks / Timers)   |
+       +----------------------------+
+                      |
+                      v
+       +----------------------------+
+       | WebSocket / SSE Broadcast  |
+       +----------------------------+
+
+📄 1. Full OpenAPI 3.0 YAML Schema (openapi.yaml)
+YAML
+
+openapi: 3.0.3
+info:
+  title: Evony Age I Engine API Specification
+  description: Complete RESTful API schema governing progression, city building, resource ticks, hero logistics, marches, and combat mechanics for Evony Age I.
+  version: 1.0.0
+servers:
+  - url: https://api.evony-age1.internal/v1
+    description: Core Production Server Engine
+paths:
+  /auth/login:
+    post:
+      summary: Authenticate player
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string, format: password }
+      responses:
+        '200':
+          description: Authenticated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+                  playerId: { type: integer }
+                  expiresIn: { type: integer }
+
+  /cities/{cityId}/buildings:
+    get:
+      summary: Get all city building instances and queue states
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: cityId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: List of buildings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Building'
+    post:
+      summary: Construct a new building
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: cityId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [buildingType, position]
+              properties:
+                buildingType: { type: string }
+                position: { type: integer }
+      responses:
+        '201':
+          description: Construction started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueTask'
+
+  /cities/{cityId}/buildings/{position}/upgrade:
+    post:
+      summary: Upgrade an existing building instance
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: cityId
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: position
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Upgrade queued successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueTask'
+
+  /marches:
+    get:
+      summary: List all active marches for player
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Active march array
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/March'
+
+  /marches/attack:
+    post:
+      summary: Initiate an attack, raid, or valley conquer march
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fromCityId, targetX, targetY, type, heroId, units]
+              properties:
+                fromCityId: { type: integer }
+                targetX: { type: integer }
+                targetY: { type: integer }
+                type: { type: string, enum: [attack, scout, transport, reinforce] }
+                heroId: { type: integer }
+                units:
+                  type: object
+                  additionalProperties: { type: integer }
+      responses:
+        '200':
+          description: March dispatched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/March'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Building:
+      type: object
+      properties:
+        position: { type: integer }
+        buildingType: { type: string }
+        level: { type: integer }
+        status: { type: string, enum: [IDLE, CONSTRUCTING, UPGRADING, DEMOLISHING] }
+    QueueTask:
+      type: object
+      properties:
+        taskId: { type: string }
+        type: { type: string }
+        startTime: { type: integer }
+        endTime: { type: integer }
+        duration: { type: integer }
+    March:
+      type: object
+      properties:
+        marchId: { type: string }
+        fromCityId: { type: integer }
+        targetCoords:
+          type: object
+          properties:
+            x: { type: integer }
+            y: { type: integer }
+        state: { type: string, enum: [MARCHING, RETURNING, COMBAT, OCCUPYING] }
+        arrivalTime: { type: integer }
+        heroId: { type: integer }
+        units:
+          type: object
+          additionalProperties: { type: integer }
+
+🛠️ 2. Comprehensive Endpoint Specification & Concrete Payloads
+
+Below is the concrete runtime API specification detailing signatures, payloads, status responses, and validation constraints across all 13 primary system modules.
+Section 1: Authentication API
+POST /auth/login
+
+    Request:
+    JSON
+
+    { "username": "LordSteve", "password": "secure_password_hash" }
+
+    Response (200 OK):
+    JSON
+
+    {
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "playerId": 1024,
+      "expiresIn": 86400
+    }
+
+GET /me
+
+    Headers: Authorization: Bearer <token>
+
+    Response (200 OK):
+    JSON
+
+    {
+      "playerId": 1024,
+      "username": "LordSteve",
+      "prestige": 48250,
+      "honor": 1200,
+      "rank": "Knight",
+      "title": "Civilian",
+      "cities": [
+        { "cityId": 1, "cityName": "Camelot", "x": 100, "y": 200, "isCapital": true },
+        { "cityId": 2, "cityName": "Avalon", "x": 102, "y": 201, "isCapital": false }
+      ]
+    }
+
+Section 2: Cities API
+GET /cities/{cityId}
+
+    Response (200 OK):
+    JSON
+
+    {
+      "cityId": 1,
+      "name": "Camelot",
+      "coordinates": { "x": 100, "y": 200 },
+      "population": { "current": 12500, "max": 15000, "idle": 3200, "laborForce": 9300 },
+      "loyalty": 95,
+      "grievance": 0,
+      "taxRate": 20,
+      "resources": {
+        "food": { "amount": 250000.50, "capacity": 1000000, "productionRate": 12000, "upkeepRate": 4500 },
+        "lumber": { "amount": 180000.00, "capacity": 1000000, "productionRate": 15000, "upkeepRate": 0 },
+        "stone": { "amount": 95000.00, "capacity": 1000000, "productionRate": 8000, "upkeepRate": 0 },
+        "iron": { "amount": 110000.00, "capacity": 1000000, "productionRate": 6000, "upkeepRate": 0 },
+        "gold": { "amount": 540000, "capacity": 99999999, "productionRate": 2500, "upkeepRate": 0 }
+      }
+    }
+
+Section 3: Buildings API
+POST /cities/{cityId}/buildings/{position}/upgrade
+
+    Request: Empty payload (target position passed in URL).
+
+    Response (202 Accepted):
+    JSON
+
+    {
+      "taskId": "TASK_BLD_8841",
+      "buildingType": "Barracks",
+      "targetLevel": 5,
+      "position": 3,
+      "startTime": 1774453800000,
+      "endTime": 1774457400000,
+      "durationSeconds": 3600
+    }
+
+    Error Response (409 Conflict - Requirement Unfulfilled):
+    JSON
+
+    {
+      "errorCode": "PREREQUISITE_FAILED",
+      "message": "Upgrade requires TownHall >= 5 and Lumber >= 20000",
+      "details": { "required": { "TownHall": 5, "lumber": 20000 }, "current": { "TownHall": 4, "lumber": 180000 } }
+    }
+
+POST /cities/{cityId}/buildings/{position}/speedup
+
+    Request:
+    JSON
+
+    { "itemId": "ITEM_SPEED_15M", "quantity": 2 }
+
+    Response (200 OK):
+    JSON
+
+    {
+      "taskId": "TASK_BLD_8841",
+      "remainingTimeSeconds": 1800,
+      "newEndTime": 1774455600000
+    }
+
+Section 4: Research API
+POST /research
+
+    Request:
+    JSON
+
+    { "techType": "Archery" }
+
+    Response (202 Accepted):
+    JSON
+
+    {
+      "taskId": "TASK_TECH_0021",
+      "techType": "Archery",
+      "targetLevel": 4,
+      "endTime": 1774461000000
+    }
+
+Section 5: Units & Training API
+POST /cities/{cityId}/train
+
+    Request:
+    JSON
+
+    { "unitType": "Archer", "count": 1000 }
+
+    Response (200 OK):
+    JSON
+
+    {
+      "queueId": "QUEUE_TRN_9012",
+      "unitType": "Archer",
+      "count": 1000,
+      "totalCost": { "food": 50000, "lumber": 100000, "gold": 10000 },
+      "estimatedCompletionTime": 1774464600000
+    }
+
+Section 6: Heroes API
+POST /cities/{cityId}/heroes/recruit
+
+    Request:
+    JSON
+
+    { "innSlot": 2 }
+
+    Response (200 OK):
+    JSON
+
+    {
+      "heroId": 102,
+      "name": "Alexander",
+      "level": 1,
+      "attributes": { "politics": 68, "attack": 84, "intelligence": 42 },
+      "loyalty": 70,
+      "status": "IDLE"
+    }
+
+POST /heroes/{heroId}/appoint-mayor
+
+    Request:
+    JSON
+
+    { "cityId": 1 }
+
+    Response (200 OK):
+    JSON
+
+    {
+      "heroId": 102,
+      "assignedRole": "MAYOR",
+      "cityId": 1,
+      "activeBuffs": { "buildingSpeedBonus": "8.4%", "resourceYieldBonus": "6.8%" }
+    }
+
+Section 7: Marches & Combat API
+POST /marches/attack
+
+    Request:
+    JSON
+
+    {
+      "fromCityId": 1,
+      "targetX": 123,
+      "targetY": 456,
+      "type": "attack",
+      "heroId": 102,
+      "units": { "Archer": 5000, "Cavalry": 1000, "Transporter": 200 }
+    }
+
+    Response (200 OK):
+    JSON
+
+    {
+      "marchId": "MARCH_77102",
+      "origin": { "x": 100, "y": 200 },
+      "destination": { "x": 123, "y": 456 },
+      "travelTimeSeconds": 840,
+      "arrivalTime": 1774454640000,
+      "state": "MARCHING"
+    }
+
+GET /reports/combat/{reportId}
+
+    Response (200 OK):
+    JSON
+
+    {
+      "reportId": "RPT_99012",
+      "timestamp": 1774450000000,
+      "result": "VICTORY",
+      "attacker": { "playerId": 1024, "hero": "Alexander (Lvl 12)", "initialUnits": { "Archer": 5000 }, "losses": { "Archer": 120 } },
+      "defender": { "type": "NPC_CITY", "level": 5, "initialUnits": { "Warrior": 2000, "Archer": 1000 }, "losses": { "Warrior": 2000, "Archer": 1000 } },
+      "plunder": { "food": 150000, "lumber": 150000, "stone": 50000, "iron": 50000, "gold": 20000 }
+    }
+
+Section 8: Quests API
+POST /quests/{questId}/claim
+
+    Response (200 OK):
+    JSON
+
+    {
+      "questId": "TUT_010_BUILD_COTTAGE_L2",
+      "status": "COMPLETED",
+      "rewardsGranted": {
+        "resources": { "food": 1000, "lumber": 1000, "stone": 1000, "iron": 1000, "gold": 500 },
+        "prestige": 100
+      },
+      "unlockedQuests": ["TUT_020_BUILD_INN", "TUT_050_BUILD_3_COTTAGES_L2"]
+    }
+
+Section 9: Economy API
+POST /cities/{cityId}/tax
+
+    Request:
+    JSON
+
+    { "taxRate": 25 }
+
+    Response (200 OK):
+    JSON
+
+    { "cityId": 1, "taxRate": 25, "projectedHourlyGold": 3125, "targetLoyalty": 75 }
+
+POST /cities/{cityId}/comfort
+
+    Request:
+    JSON
+
+    { "action": "DisasterRelief" }
+
+    Response (200 OK):
+    JSON
+
+    {
+      "cityId": 1,
+      "cost": { "food": 20000 },
+      "newLoyalty": 80,
+      "newGrievance": 0,
+      "cooldownEndTime": 1774455600000
+    }
+
+Section 10: Valleys & NPCs API
+GET /valleys?x=100&y=200&radius=2
+
+    Response (200 OK):
+    JSON
+
+    [
+      { "x": 101, "y": 200, "type": "Forest", "level": 4, "owner": "NONE" },
+      { "x": 100, "y": 201, "type": "NPC_City", "level": 5, "owner": "BARBARIAN" },
+      { "x": 102, "y": 202, "type": "Lake", "level": 10, "owner": "Player_99" }
+    ]
+
+Section 11: Items API
+POST /items/use
+
+    Request:
+    JSON
+
+    {
+      "itemId": "ITEM_PRIMARY_CIV_PACKAGE",
+      "targetCityId": 1
+    }
+
+    Response (200 OK):
+    JSON
+
+    {
+      "consumedItem": "ITEM_PRIMARY_CIV_PACKAGE",
+      "itemsGranted": { "SpeedUp_15m": 5, "AriesAmulet": 1 },
+      "resourcesGranted": { "food": 50000, "lumber": 50000, "stone": 50000, "iron": 50000 }
+    }
+
+Section 12: Alliance API
+POST /alliance/create
+
+    Request:
+    JSON
+
+    { "allianceName": "Sovereign", "embassyLevelCheck": 1 }
+
+    Response (201 Created):
+    JSON
+
+    {
+      "allianceId": 45,
+      "name": "Sovereign",
+      "leaderId": 1024,
+      "memberCount": 1,
+      "maxMembers": 10
+    }
+
+Section 13: System API
+GET /system/time
+
+    Response (200 OK):
+    JSON
+
+    { "serverTime": 1774453800000, "timezone": "UTC" }
+
+⚡ 3. Real-Time Push Events Strategy (WebSockets/SSE)
+
+HTTP polling for fast tick loops (e.g., march positioning, chat updates, incoming attacks) scales poorly under MMORTS load profiles. The system architecture enforces a Hybrid HTTP/WebSocket Protocol:
+
+    Commands & Mutations (HTTP REST): All client actions (upgrading, recruiting, attacking) are submitted via standard HTTP POST endpoints.
+
+    State Delta Synchronization (WebSocket / SSE): The server pushes state mutations down to clients over persistent connections using JSON event schemas.
+
+       +--------------------+                    +---------------------+
+       |    Game Engine     |                    |   Connected Client  |
+       +--------------------+                    +---------------------+
+                 |                                          |
+                 | ----- EVENT: MARCH_UPDATE -------------> |
+                 | ----- EVENT: QUEUE_COMPLETED ----------> |
+                 | ----- EVENT: INCOMING_ATTACK ------------> |
+                 |                                          |
+
+WebSocket Real-time Event Schemas
+1. Incoming Attack Alert (INCOMING_ATTACK)
+
+Broadcasted immediately when an enemy march targets a player's city.
+JSON
+
+{
+  "event": "INCOMING_ATTACK",
+  "timestamp": 1774453810000,
+  "payload": {
+    "marchId": "MARCH_99410",
+    "targetCityId": 1,
+    "attackerName": "EnemyLord",
+    "originCoords": { "x": 150, "y": 300 },
+    "arrivalTime": 1774454650000,
+    "beaconTowerLevel": 5,
+    "scoutInfo": {
+      "estimatedTroopCount": "5000~10000",
+      "heroName": "Unknown"
+    }
+  }
+}
+
+2. Construction Queue Completion (QUEUE_COMPLETED)
+
+Pushed when a timer reaches zero to instantly refresh the client UI without requiring page reloads.
+JSON
+
+{
+  "event": "QUEUE_COMPLETED",
+  "timestamp": 1774457400000,
+  "payload": {
+    "cityId": 1,
+    "taskType": "BUILDING_UPGRADE",
+    "targetEntity": "Barracks",
+    "newLevel": 5,
+    "position": 3
+  }
+}
+
+3. March Position Delta (MARCH_TICK)
+
+Periodic tick pushed every 3 seconds for actively viewed marches on the world map.
+JSON
+
+{
+  "event": "MARCH_TICK",
+  "timestamp": 1774453815000,
+  "payload": {
+    "marchId": "MARCH_77102",
+    "currentCoords": { "x": 104.2, "y": 203.8 },
+    "remainingSeconds": 825
+  }
+}
