@@ -1,5 +1,3 @@
-This has a great core concept already. The biggest improvement is to make it sound more like a game pitch, build excitement, and clean up the grammar while preserving the harsh, competitive feel of the original Evony Age I.
-
 Empire
 
 Empire is a tick-based strategy game inspired by the original Evony: Age I PC experience, rebuilt for a modern web-based platform.
