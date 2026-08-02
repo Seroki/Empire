@@ -139,6 +139,11 @@
     background: transparent;
   }
 
+  .nav-actions {
+    display: flex;
+    gap: 6px;
+  }
+
   /* Section Headers & Slot Badges */
   .section-header {
     font-family: var(--font-display);
@@ -197,7 +202,6 @@
     background: rgba(107, 143, 90, 0.05);
   }
 
-  /* Compact Locked Slot Variant */
   .building-card.slot-locked {
     flex: 0 0 64px;
     max-width: 64px;
@@ -230,6 +234,30 @@
     color: var(--faded);
     line-height: 1;
     text-align: center;
+  }
+
+  .building-card.researching {
+    border-color: var(--rust);
+    animation: pulse-rust 2.4s ease-in-out infinite;
+  }
+
+  .research-busy-badge {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 9px;
+    color: var(--rust);
+    margin: 2px 0 4px;
+  }
+
+  .research-busy-icon {
+    display: inline-block;
+    animation: spin-icon 1.6s linear infinite;
+  }
+
+  @keyframes spin-icon {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
   }
 
   @keyframes pulse-rust {
@@ -299,7 +327,7 @@
     background: rgba(10,8,5,0.85);
     align-items: center;
     justify-content: center;
-    z-index: 100;
+    z-index: 1000;
     padding: 1rem;
   }
   .modal-overlay.visible { display: flex; }
@@ -312,6 +340,40 @@
     width: 100%;
     text-align: center;
   }
+
+  .game-modal-panel {
+    background: var(--panel);
+    border: 1px solid var(--brass-dim);
+    border-top: 3px solid var(--brass);
+    padding: 1rem;
+    max-width: 600px;
+    width: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+  }
+  .modal-header h2 {
+    margin: 0;
+    font-family: var(--font-display);
+    color: var(--brass);
+    font-size: 14px;
+  }
+  .close-btn {
+    background: transparent;
+    border: none;
+    color: var(--faded);
+    font-size: 18px;
+    cursor: pointer;
+  }
+  .close-btn:hover { color: var(--rust); }
+
   .modal-title {
     font-family: var(--font-display);
     font-size: 12px;
@@ -354,40 +416,40 @@
         <td>Honor</td>
         <td id="ticker"></td>
       </tr>
-     <tr>
-  <td style="text-align: center;"><button class="action-btn" onclick="handleSystemAction('avatar_click')">IMG</button></td>
-  <td id="top-player-username">Loading...</td>
-  <td id="top-player-title">--</td>
-  <td id="top-player-prestige">0</td>
-  <td id="top-player-honor">0</td>
-  <td colspan="5" style="padding: 0;">
-    <table style="margin: 0; border: none; width: 100%;">
-      <!-- DYNAMIC WAREHOUSE SUB-HEADER -->
-      <tr id="warehouse-cap-row">
-        <td colspan="6" style="text-align: center; padding: 4px; border-bottom: 1px solid #4a3b2c; font-size: 0.9em; background-color: rgba(0, 0, 0, 0.2);">
-          <span style="color: #e0d8c3; font-weight: bold; margin-right: 12px;">
-            Warehouse Capacity <span id="wh-capacity">0</span>
-          </span>
-          <span style="color: #2ecc71; font-weight: bold;" id="wh-protected">0</span>
-          <span style="color: #e0d8c3;"> / </span>
-          <span style="color: #e74c3c; font-weight: bold;" id="wh-at-risk">0</span>
+      <tr>
+        <td style="text-align: center;"><button class="action-btn" onclick="handleSystemAction('avatar_click')">IMG</button></td>
+        <td id="top-player-username">Loading...</td>
+        <td id="top-player-title">--</td>
+        <td id="top-player-prestige">0</td>
+        <td id="top-player-honor">0</td>
+        <td colspan="5" style="padding: 0;">
+          <table style="margin: 0; border: none; width: 100%;">
+            <!-- DYNAMIC WAREHOUSE SUB-HEADER -->
+            <tr id="warehouse-cap-row">
+              <td colspan="6" style="text-align: center; padding: 4px; border-bottom: 1px solid #4a3b2c; font-size: 0.9em; background-color: rgba(0, 0, 0, 0.2);">
+                <span style="color: #e0d8c3; font-weight: bold; margin-right: 12px;">
+                  Warehouse Capacity <span id="wh-capacity">0</span>
+                </span>
+                <span style="color: #2ecc71; font-weight: bold;" id="wh-protected">0</span>
+                <span style="color: #e0d8c3;"> / </span>
+                <span style="color: #e74c3c; font-weight: bold;" id="wh-at-risk">0</span>
+              </td>
+            </tr>
+            <!-- RESOURCE TICKER ROW -->
+            <tr id="ticker-row">
+              <td class="ticker-cell"><div class="ticker-label">FOOD</div><div class="ticker-value" id="res-food">0</div></td>
+              <td class="ticker-cell"><div class="ticker-label">WOOD</div><div class="ticker-value" id="res-wood">0</div></td>
+              <td class="ticker-cell"><div class="ticker-label">STONE</div><div class="ticker-value" id="res-stone">0</div></td>
+              <td class="ticker-cell"><div class="ticker-label">IRON</div><div class="ticker-value" id="res-iron">0</div></td>
+              <td class="ticker-cell"><div class="ticker-label">GOLD</div><div class="ticker-value" id="res-gold">0</div></td>
+              <td class="ticker-cell" style="min-width: 150px;">
+                <div class="ticker-label">WORKFORCE & POPULATION</div>
+                <div id="res-population">--</div>
+              </td>
+            </tr>
+          </table>
         </td>
       </tr>
-      <!-- RESOURCE TICKER ROW -->
-      <tr id="ticker-row">
-        <td class="ticker-cell"><div class="ticker-label">FOOD</div><div class="ticker-value" id="res-food">0</div></td>
-        <td class="ticker-cell"><div class="ticker-label">WOOD</div><div class="ticker-value" id="res-wood">0</div></td>
-        <td class="ticker-cell"><div class="ticker-label">STONE</div><div class="ticker-value" id="res-stone">0</div></td>
-        <td class="ticker-cell"><div class="ticker-label">IRON</div><div class="ticker-value" id="res-iron">0</div></td>
-        <td class="ticker-cell"><div class="ticker-label">GOLD</div><div class="ticker-value" id="res-gold">0</div></td>
-        <td class="ticker-cell" style="min-width: 150px;">
-          <div class="ticker-label">WORKFORCE & POPULATION</div>
-          <div id="res-population">--</div>
-        </td>
-      </tr>
-    </table>
-  </td>
-</tr>
     </table>
   </div>
 
@@ -481,6 +543,18 @@
         </td>
       </tr>
     </table>
+    <table>
+      <tr><th>Barracks and Research Queues & Timers</th></tr>
+      <tr>
+        <td>
+          <!-- Navigation / Action Bar -->
+          <div class="nav-actions">
+            <button class="action-btn" onclick="openBarracksGui(currentCityId)">🏰 Barracks</button>
+            <button class="action-btn" onclick="openResearchGui(currentCityId)">🔬 Research</button>
+          </div>
+        </td>
+      </tr>
+    </table>
 
   </div>
 
@@ -526,16 +600,67 @@
   </div>
 </div>
 
+<!-- BARRACKS MODAL CONTAINER -->
+<div class="modal-overlay" id="barracks-modal" onclick="closeBarracksGui(event)">
+  <div class="game-modal-panel" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2>🏰 Barracks Training Ground</h2>
+      <button class="close-btn" onclick="closeBarracksGui()">&times;</button>
+    </div>
+    <div id="barracks-content">
+      <p style="font-size: 11px; color: var(--faded);">Loading Barracks Data...</p>
+    </div>
+  </div>
+</div>
+
+<!-- RESEARCH MODAL CONTAINER -->
+<div class="modal-overlay" id="research-modal" onclick="closeResearchGui(event)">
+  <div class="game-modal-panel" onclick="event.stopPropagation()" style="width: 820px; max-width: 95vw;">
+    <div class="modal-header">
+      <h2>🔬 Academy Research Lab</h2>
+      <button class="close-btn" onclick="closeResearchGui()">&times;</button>
+    </div>
+
+    <div class="research-tab-bar">
+      <button class="research-tab-btn active" onclick="switchDiscipline('economy', this)">Economy</button>
+      <button class="research-tab-btn" onclick="switchDiscipline('military', this)">Military</button>
+      <button class="research-tab-btn" onclick="switchDiscipline('construction', this)">Construction</button>
+      <button class="research-tab-btn" onclick="switchDiscipline('intelligence', this)">Intelligence</button>
+      <button class="research-tab-btn" onclick="switchDiscipline('movement', this)">Movement</button>
+      <button class="research-tab-btn" onclick="switchDiscipline('defense', this)">Defense</button>
+    </div>
+
+    <div id="research-content">
+      <p style="font-size: 11px; color: var(--faded); padding: 12px;">Loading Technology Trees...</p>
+    </div>
+  </div>
+</div>
+
+<style>
+  .research-tab-bar { display: flex; gap: 4px; margin: 8px 0 12px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .research-tab-btn { background: none; border: none; color: var(--faded); padding: 8px 12px; cursor: pointer; font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; }
+  .research-tab-btn.active { color: var(--brass); border-bottom: 2px solid var(--brass); font-weight: bold; }
+  .research-tech-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-height: 420px; overflow-y: auto; padding: 4px; }
+  .research-tech-card { background: var(--panel-raised); padding: 10px; border: 1px solid var(--line); }
+  .research-tech-card.locked { opacity: 0.55; }
+  .research-tech-card h3 { margin: 0 0 4px; font-size: 13px; color: var(--parchment); }
+  .research-tech-card p { margin: 0 0 6px; font-size: 10px; color: var(--faded); }
+  .research-cost-list { font-size: 9px; color: var(--brass-dim); margin: 6px 0; }
+  .research-btn { background: var(--brass); color: var(--ink); border: none; padding: 6px 10px; font-weight: bold; cursor: pointer; width: 100%; font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; }
+  .research-btn:hover { background: var(--parchment); }
+  .research-btn:disabled { opacity: 0.5; cursor: default; }
+</style>
+
 <script>
 let currentCityId = 1;
+let activeResearch = null;
 const RESOURCE_KEYS = ["food", "wood", "stone", "iron", "gold"];
-const API_BASE = ""; // relative — works from any device that can reach this server, not just localhost
+const API_BASE = "";
 
 let taxInputTouched = false;
 let currentPlayerId = 1;
 let currentGameState = { queueBusy: false, currentResources: {} };
 
-// SVG Iso Lock Padlock
 const LOCK_ICON_SVG = `
   <svg class="lock-icon" viewBox="0 0 24 24">
     <path d="M12 2C9.24 2 7 4.24 7 7v3H6c-1.1 0-2 .9-2 2v9c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-9c0-1.1-.9-2-2-2h-1V7c0-2.76-2.24-5-5-5zm-3 5c0-1.66 1.34-3 3-3s3 1.34 3 3v3H9V7zm3 8c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2z"/>
@@ -543,7 +668,7 @@ const LOCK_ICON_SVG = `
 `;
 
 function formatNumber(n) {
-  return Number(n || 0).toLocaleString("en-US");
+  return Math.floor(Number(n || 0)).toLocaleString("en-US");
 }
 
 function formatDuration(ms) {
@@ -564,6 +689,366 @@ function showErrorModal(message, title = "Order Rejected") {
 
 function hideErrorModal() {
   document.getElementById("modal-overlay").classList.remove("visible");
+}
+
+/* Modal Open / Close Triggers */
+let activeBarracksId = null;
+
+async function openBarracksGui(cityId = currentCityId, targetBarracksId = null) {
+  const modal = document.getElementById("barracks-modal");
+  const content = document.getElementById("barracks-content");
+  if (!modal || !content) return;
+
+  modal.classList.add("visible");
+
+  if (!targetBarracksId) {
+    content.innerHTML = `<p style="font-size: 11px; color: var(--faded); padding: 12px;">Locating Barracks structures in City ${cityId}...</p>`;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/units/barracks?cityId=${cityId}`);
+    const data = await res.json();
+
+    if (res.ok && data.success) {
+      const barracksList = data.barracks || [];
+
+      if (barracksList.length === 0) {
+        content.innerHTML = `<div class="empty-note" style="padding: 12px;">No Barracks constructed in this city yet. Build one from the Inner City plots!</div>`;
+        return;
+      }
+
+      activeBarracksId = targetBarracksId || barracksList[0].id;
+
+      // Use the authoritative available-population figure from the backend
+      // (accounts for population reserved by the active recruitment queue)
+      // rather than the raw city total.
+      const availablePop = Number(data.availablePopulation || 0);
+      const allUnits = data.units || [];
+      const queueList = data.queue || [];
+
+      // 1. Facility Selector Banner
+      let html = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; background: var(--panel-raised); padding: 6px 8px; border: 1px solid var(--line);">
+          <div>
+            <label style="font-size: 10px; color: var(--brass-dim); text-transform: uppercase;">Facility:</label>
+            <select id="barracks-select" onchange="openBarracksGui(${cityId}, this.value)" style="background: var(--ink); color: var(--parchment); border: 1px solid var(--line); font-family: var(--font-mono); font-size: 11px; padding: 2px 4px; margin-left: 4px;">
+              ${barracksList.map(b => `
+                <option value="${b.id}" ${b.id == activeBarracksId ? 'selected' : ''}>
+                  ${b.name || 'Barracks'} (Lv ${b.level}) #${b.id}
+                </option>
+              `).join('')}
+            </select>
+          </div>
+          <div style="font-size: 11px;">
+            <span style="color: var(--faded);">Available Pop:</span>
+            <strong style="color: ${availablePop > 0 ? 'var(--green)' : 'var(--rust)'};">${formatNumber(availablePop)}</strong>
+          </div>
+        </div>
+      `;
+
+      // 2. Interactive Unit Table with Training Inputs
+      if (allUnits.length > 0) {
+        html += `
+          <table style="width:100%; border-collapse: collapse;">
+            <thead>
+              <tr style="border-bottom: 1px solid var(--line); text-align: left;">
+                <th style="padding: 6px;">UNIT</th>
+                <th style="padding: 6px;">STATS & COSTS</th>
+                <th style="padding: 6px; text-align: center;">OWNED</th>
+                <th style="padding: 6px;">RECRUIT ORDER</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+
+        allUnits.forEach(u => {
+          const unlocked = u.isAvailable !== false;
+          const popCostPerUnit = Math.max(1, Number(u.population_cost || u.pop_cost || 1));
+          // Use the backend's own maxTrainable when available; it already
+          // accounts for the live recruitment queue.
+          const maxTrainableByPop = Number(u.maxTrainable ?? Math.floor(availablePop / popCostPerUnit));
+
+          html += `
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); ${!unlocked ? 'opacity: 0.4;' : ''}">
+              <td style="padding: 6px;">
+                <strong style="color: var(--parchment);">${u.name}</strong>
+                <div style="font-size: 9px; color: var(--faded);">
+                  ${unlocked ? `👥 Pop: ${popCostPerUnit}` : `<span style="color:var(--rust);">${u.reason || `Req. Barracks Lv ${u.required_barracks_level || 1}`}</span>`}
+                </div>
+              </td>
+              <td style="padding: 6px; font-size: 10px; color: var(--faded);">
+                <div>⚔️ ${u.attack || 0} | 🛡️ ${u.defense || 0}</div>
+                <div style="font-size: 9px; color: var(--brass-dim); margin-top: 2px;">
+                  🌾 ${formatNumber(u.food_cost || 0)} | 🪵 ${formatNumber(u.wood_cost || 0)} | 🪨 ${formatNumber(u.stone_cost || 0)} | ⛏️ ${formatNumber(u.iron_cost || 0)} | 🪙 ${formatNumber(u.gold_cost || 0)}
+                </div>
+              </td>
+              <td style="padding: 6px; font-size: 11px; font-weight: 600; text-align: center;">
+                ${formatNumber(u.owned || 0)}
+              </td>
+              <td style="padding: 6px;">
+                ${unlocked ? `
+                  <div style="display: flex; flex-direction: column; gap: 2px;">
+                    <div style="display: flex; gap: 4px; align-items: center;">
+                      <input type="number" 
+                             id="train-qty-${u.code || u.id}" 
+                             min="1" 
+                             value="1" 
+                             style="width: 50px; background: var(--ink); border: 1px solid var(--line); color: var(--parchment); font-family: var(--font-mono); font-size: 10px; text-align: center; padding: 2px;">
+                      <button class="btn-edit-inline" style="padding: 2px 4px; font-size: 9px;" onclick="document.getElementById('train-qty-${u.code || u.id}').value = ${maxTrainableByPop}">Max</button>
+                      <button class="action-btn" style="padding: 2px 8px; font-size: 9px;" onclick="submitTrainOrder('${u.code || u.id}')">
+                        Train
+                      </button>
+                    </div>
+                    <div style="font-size: 8px; color: var(--faded);">Max: <span style="color: var(--brass);">${formatNumber(maxTrainableByPop)}</span></div>
+                  </div>
+                ` : `
+                  <span style="font-size: 9px; color: var(--rust);">Locked</span>
+                `}
+              </td>
+            </tr>
+          `;
+        });
+
+        html += `</tbody></table>`;
+      } else {
+        html += `<div class="empty-note" style="padding: 12px;">No unit definitions available.</div>`;
+      }
+
+      // 3. Active Recruitment Queue Section
+      if (queueList.length > 0) {
+        html += `
+          <div style="margin-top: 12px; border-top: 1px solid var(--line); padding-top: 8px;">
+            <h4 style="font-size: 11px; color: var(--brass); margin: 0 0 6px 0; text-transform: uppercase;">Active Recruitment Queue</h4>
+            <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
+              <thead>
+                <tr style="text-align: left; color: var(--faded); border-bottom: 1px solid rgba(255,255,255,0.05);">
+                  <th style="padding: 4px 8px;">Unit</th>
+                  <th style="padding: 4px 8px;">Qty</th>
+                  <th style="padding: 4px 8px;">Completes At</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${queueList.map(q => `
+                  <tr style="border-bottom: 1px solid rgba(255,255,255,0.02);">
+                    <td style="padding: 4px 8px; color: var(--parchment);">${q.name}</td>
+                    <td style="padding: 4px 8px; font-weight: 600;">${formatNumber(q.quantity)}</td>
+                    <td style="padding: 4px 8px; color: var(--brass-dim);">${new Date(q.finish_at).toLocaleTimeString()}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+
+      content.innerHTML = html;
+    } else {
+      content.innerHTML = `<div style="color: var(--rust); padding: 12px;">${data.error || "Failed to load Barracks."}</div>`;
+    }
+  } catch (err) {
+    console.error("Barracks GUI Error:", err);
+    content.innerHTML = `<div style="color: var(--rust); padding: 12px;">Could not connect to game server.</div>`;
+  }
+}
+
+async function submitTrainOrder(unitCode) {
+  const qtyInput = document.getElementById(`train-qty-${unitCode}`);
+  const quantity = Math.max(1, Number(qtyInput?.value || 1));
+
+  if (!activeBarracksId) {
+    showErrorModal("No Barracks selected.");
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/units/train`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        cityId: currentCityId,
+        barracksId: activeBarracksId,
+        unitCode: unitCode,
+        quantity: quantity
+      })
+    });
+    const result = await res.json();
+    if (res.ok && result.success) {
+      openBarracksGui(currentCityId, activeBarracksId);
+      refresh();
+    } else {
+      showErrorModal(result.error || result.message || "Failed to initiate training.");
+    }
+  } catch (err) {
+    showErrorModal("Could not connect to game server to issue training order.");
+  }
+}
+
+// This was missing entirely — nothing could ever close the Barracks modal,
+// which is why the backdrop stayed up ("black out") no matter what happened.
+function closeBarracksGui(event) {
+  if (event && event.target !== event.currentTarget) return;
+  const modal = document.getElementById("barracks-modal");
+  if (modal) modal.classList.remove("visible");
+}
+
+let researchData = null;
+let currentDiscipline = 'economy';
+
+async function openResearchGui(cityId = currentCityId) {
+  const modal = document.getElementById("research-modal");
+  const content = document.getElementById("research-content");
+  modal.classList.add("visible");
+  content.innerHTML = `<p style="font-size: 11px; color: var(--faded); padding: 12px;">Loading Technology Trees...</p>`;
+
+  try {
+    const res = await fetch(`${API_BASE}/research?cityId=${cityId}`);
+    const data = await res.json();
+
+    if (res.ok && data.success) {
+      researchData = data;
+      content.innerHTML = `<div id="tech-container" class="research-tech-grid"></div>`;
+      renderTechs();
+    } else {
+      content.innerHTML = `<div style="color: var(--rust); padding: 12px;">${data.error || "Failed to load research tree."}</div>`;
+    }
+  } catch (err) {
+    console.error("Research GUI Error:", err);
+    content.innerHTML = `<div style="color: var(--rust); padding: 12px;">Could not connect to game server.</div>`;
+  }
+}
+
+function closeResearchGui(event) {
+  if (event && event.target !== event.currentTarget) return;
+  document.getElementById("research-modal").classList.remove("visible");
+}
+
+function switchDiscipline(discipline, btnEl) {
+  currentDiscipline = discipline;
+  document.querySelectorAll('.research-tab-btn').forEach(btn => btn.classList.remove('active'));
+  if (btnEl) btnEl.classList.add('active');
+  renderTechs();
+}
+
+function renderTechs() {
+  const container = document.getElementById('tech-container');
+  if (!container || !researchData || !researchData.technologies) return;
+  container.innerHTML = '';
+
+  const academyLevel = researchData.academyLevel || 0;
+  const activeQueue = researchData.activeQueue;
+
+  Object.entries(researchData.technologies).forEach(([code, tech]) => {
+    const discipline = tech.discipline || 'economy';
+    if (discipline !== currentDiscipline) return;
+
+    const currentLevel = tech.globalLevel || 0;
+    const targetLevel = currentLevel + 1;
+    const reqAcademy = tech.requiredAcademyLevel || 1;
+    const isAcademyMet = academyLevel >= reqAcademy;
+    const isMaxLevel = tech.maxLevel && currentLevel >= tech.maxLevel;
+    const isResearchingThis = activeQueue?.tech_code === code;
+
+    const card = document.createElement('div');
+    card.className = `research-tech-card ${(!isAcademyMet || isMaxLevel) ? 'locked' : ''}`;
+
+    let prereqText = '';
+    if (tech.prerequisite) {
+      const prereqCode = tech.prerequisite.tech;
+      const prereqName = researchData.technologies[prereqCode]?.name || prereqCode;
+      prereqText = `<br/><small style="color: var(--faded);">Requires ${prereqName} Lv ${tech.prerequisite.level}</small>`;
+    }
+
+    const costList = (tech.nextLevelCost && !isMaxLevel) ? `
+      🌾 ${tech.nextLevelCost.food || 0} | 🪵 ${tech.nextLevelCost.wood || 0} | 
+      🪨 ${tech.nextLevelCost.stone || 0} | ⛏️ ${tech.nextLevelCost.iron || 0} | 
+      🪙 ${tech.nextLevelCost.gold || 0}
+    ` : '';
+
+    card.innerHTML = `
+      <h3>${tech.name} <small style="color: var(--faded);">(Lvl ${currentLevel}${tech.maxLevel ? '/' + tech.maxLevel : ''})</small></h3>
+      <p>${tech.description || 'Enhances city capabilities.'}</p>
+      ${costList ? `<div class="research-cost-list"><strong>Next Level Cost:</strong><br/>${costList}</div>` : ''}
+      <p style="font-size: 9px; color: var(--faded);">Requires Academy Lv ${reqAcademy}${prereqText}</p>
+      <button class="research-btn" ${isMaxLevel ? 'disabled' : ''} onclick="attemptResearch('${code}', ${targetLevel}, ${reqAcademy})">
+        ${isMaxLevel ? 'Max Level' : isResearchingThis ? 'Researching...' : 'Research'}
+      </button>
+    `;
+
+    container.appendChild(card);
+  });
+}
+
+function attemptResearch(techCode, targetLevel, requiredAcademyLevel) {
+  const academyLevel = researchData.academyLevel || 0;
+  const tech = researchData.technologies ? researchData.technologies[techCode] : null;
+
+  if (!tech) {
+    showErrorModal('Invalid technology code.', 'Error');
+    return;
+  }
+  if (tech.maxLevel && targetLevel > tech.maxLevel) {
+    showErrorModal(`${tech.name} is already at its maximum level (${tech.maxLevel}).`, 'Max Level Reached');
+    return;
+  }
+  if (researchData.activeQueue) {
+    showErrorModal(`You are already researching ${researchData.activeQueue.tech_code}. Wait until it finishes.`, 'Research Queue Busy');
+    return;
+  }
+  if (academyLevel < requiredAcademyLevel) {
+    showErrorModal(`You need Academy Level ${requiredAcademyLevel} to research this. Your current Academy level is ${academyLevel}.`, 'Academy Level Too Low');
+    return;
+  }
+  if (tech.prerequisite) {
+    const prereqCode = tech.prerequisite.tech;
+    const prereqTech = researchData.technologies[prereqCode];
+    const prereqCurrentLevel = prereqTech ? (prereqTech.globalLevel || 0) : 0;
+    if (prereqCurrentLevel < tech.prerequisite.level) {
+      const prereqName = prereqTech ? prereqTech.name : prereqCode;
+      showErrorModal(`Requires ${prereqName} Level ${tech.prerequisite.level}. (Current: Level ${prereqCurrentLevel})`, 'Prerequisite Not Met');
+      return;
+    }
+  }
+  if (tech.nextLevelCost && researchData.resources) {
+    const res = researchData.resources;
+    const cost = tech.nextLevelCost;
+    if (
+      (cost.food && res.food < cost.food) ||
+      (cost.wood && res.wood < cost.wood) ||
+      (cost.stone && res.stone < cost.stone) ||
+      (cost.iron && res.iron < cost.iron) ||
+      (cost.gold && res.gold < cost.gold)
+    ) {
+      showErrorModal('You do not have enough resources for this research.', 'Insufficient Resources');
+      return;
+    }
+  }
+
+  sendStartResearchRequest(techCode, targetLevel);
+}
+
+async function sendStartResearchRequest(techCode, targetLevel) {
+  try {
+    const res = await fetch(`${API_BASE}/research/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cityId: currentCityId,
+        techCode: techCode,
+        targetLevel: targetLevel
+      })
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      showErrorModal(data.error || 'Research order rejected.', 'Research Failed');
+    } else {
+      openResearchGui(currentCityId);
+      if (typeof refresh === "function") refresh();
+    }
+  } catch (err) {
+    showErrorModal('Failed to communicate with the server.', 'Error');
+  }
 }
 
 /* UI Action Hooks */
@@ -668,15 +1153,12 @@ async function submitTaxRate() {
 
 function populationCellHTML(resources, queue) {
   const totalWorkers = Number(resources.workers || 0);
-  // Reserved workers come from the real construction_queue data —
-  // each queued item carries workers_used, which is the source of
-  // truth (not fields the backend never actually sent).
   const reservedWorkers = (queue || []).reduce(
     (sum, item) => sum + (Number(item.workers_used) || 0),
     0
   );
   const availableWorkers = Math.max(0, totalWorkers - reservedWorkers);
-  const maxCap = Number(resources.cottagesPopulation || resources.basePopulation || resources.population || 0);
+  const maxCap = Number(resources.population || 0);
 
   return `
     <div class="pop-row"><span>Available Workers:</span><strong style="color: var(--green);">${formatNumber(availableWorkers)} / ${formatNumber(totalWorkers)}</strong></div>
@@ -700,7 +1182,6 @@ function updateTicker(resources) {
 
   const popEl = document.getElementById("res-population");
   if (popEl) {
-    // Pass currentGameState.constructionQueue (or currentGameState.queue) into populationCellHTML
     const activeQueue = currentGameState.constructionQueue || currentGameState.queue || [];
     popEl.innerHTML = populationCellHTML(resources, activeQueue);
   }
@@ -712,7 +1193,14 @@ function updateTicker(resources) {
 }
 
 function makeBuildingCard(b, isBusy) {
-  const storage = b.field_storage;
+  const hasStorageData = b.slot_pool === 'outer' && b.max_capacity != null;
+  const storage = hasStorageData ? {
+    stored: Number(b.stored_resource || 0),
+    capacity: Number(b.max_capacity || 0),
+    percent: b.max_capacity > 0 ? Math.min(100, (Number(b.stored_resource || 0) / Number(b.max_capacity)) * 100) : 0,
+    full: Number(b.stored_resource || 0) >= Number(b.max_capacity || 0)
+  } : null;
+
   const storageHTML = storage ? `
     <div style="margin: 4px 0;">
       <div style="height: 5px; background: var(--ink); border: 1px solid var(--line); overflow: hidden;">
@@ -725,14 +1213,25 @@ function makeBuildingCard(b, isBusy) {
     </button>
   ` : "";
 
+  const isAcademy = (b.building_name || b.name || "").toUpperCase() === "ACADEMY";
+  const isResearching = isAcademy && !!activeResearch;
+
+  const researchBadgeHTML = isResearching ? `
+    <div class="research-busy-badge" data-finish="${activeResearch.finish_time}">
+      <span class="research-busy-icon">🔬</span>
+      <span data-countdown>--:--:--</span>
+    </div>
+  ` : "";
+
   return `
-    <div class="building-card ${b.level === 0 ? "under-construction" : ""}">
+    <div class="building-card ${b.level === 0 ? "under-construction" : ""} ${isResearching ? "researching" : ""}">
       <div>
-        <div class="b-name">${b.building_name}</div>
+        <div class="b-name">${b.building_name || b.name || "Building"}</div>
         <div class="b-meta">
-          <span>${b.level === 0 ? "" : `<span class="b-level">Lv ${b.level}</span>`}</span>
+          <span>${b.level === 0 ? "" : `<span class="b-level">Lv ${b.level || 1}</span>`}</span>
           <span class="b-tag ${b.level === 0 ? "building" : ""}">${b.level === 0 ? "Building" : (b.slot_pool || "fixed")}</span>
         </div>
+        ${researchBadgeHTML}
         ${storageHTML}
       </div>
       <button class="action-btn" ${b.level === 0 || isBusy ? "disabled" : ""} onclick="startBuildingAction('upgrade', ${b.id})">
@@ -747,37 +1246,55 @@ async function collectResource(buildingId) {
     const res = await fetch(`${API_BASE}/cities/${currentCityId}/collect`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ buildingId })
+      body: JSON.stringify({ 
+        cityId: currentCityId,
+        buildingId: buildingId 
+      })
     });
     const result = await res.json();
-    if (res.ok) refresh();
-    else showErrorModal(result.error || "Failed to collect resource");
+    if (res.ok && result.success !== false) {
+      refresh(); // Reload resources & field storage levels
+    } else {
+      showErrorModal(result.error || result.message || "Failed to collect resources from field.");
+    }
   } catch (err) {
-    showErrorModal("Could not reach the server.");
+    showErrorModal("Could not reach the server to collect resources.");
   }
 }
 
 function renderBuildings(buildings, townHallLevel, isBusy) {
   const innerEl = document.getElementById("inner-city-buildings");
   const outerEl = document.getElementById("outer-resource-fields");
+  if (!innerEl || !outerEl) return;
 
-  const innerList = (buildings || []).filter(b => b.slot_pool === 'inner' || b.slot_pool === 'fixed' || !b.slot_pool);
-  const outerList = (buildings || []).filter(b => b.slot_pool === 'outer');
+  const thLvl = Math.max(1, Number(townHallLevel) || 1);
+  const safeBuildings = Array.isArray(buildings) ? buildings : [];
 
-  const thLvl = townHallLevel || 1;
+  // Helper to identify resource fields even if slot_pool is missing
+  const isOuterField = (b) => {
+    if (b.slot_pool === 'outer') return true;
+    const name = (b.building_name || b.name || '').toLowerCase();
+    return name.includes('farm') || 
+           name.includes('sawmill') || 
+           name.includes('quarry') || 
+           name.includes('iron mine') || 
+           name.includes('gold mine');
+  };
 
-  // --- INNER SLOTS CALCULATION ---
+  const innerList = safeBuildings.filter(b => !isOuterField(b));
+  const outerList = safeBuildings.filter(b => isOuterField(b));
+
+  // --- 1. INNER CITY BUILDINGS ---
   const totalUnlockedInner = Math.min(32, 5 + (thLvl * 3));
   const builtInnerCount = innerList.length;
   const openInnerCount = Math.max(0, totalUnlockedInner - builtInnerCount);
-  const lockedInnerCount = 32 - totalUnlockedInner;
+  const lockedInnerCount = Math.max(0, 32 - totalUnlockedInner);
 
   document.getElementById("inner-slot-badge").innerHTML = 
     `Built: <strong>${builtInnerCount}</strong> | Unlocked: <strong class="open">${totalUnlockedInner}</strong> / <strong>32</strong>`;
 
   let innerHTML = innerList.map(b => makeBuildingCard(b, isBusy)).join("");
 
-  // Render open inner slots
   for (let i = 0; i < openInnerCount; i++) {
     innerHTML += `
       <div class="building-card slot-open">
@@ -792,9 +1309,8 @@ function renderBuildings(buildings, townHallLevel, isBusy) {
     `;
   }
 
-  // Render compact locked inner slots with padlock icon
   for (let i = 0; i < lockedInnerCount; i++) {
-    const requiredTH = Math.ceil((totalUnlockedInner + i + 1 - 5) / 3);
+    const requiredTH = Math.max(1, Math.ceil((totalUnlockedInner + i + 1 - 5) / 3));
     innerHTML += `
       <div class="building-card slot-locked" title="Requires Town Hall Lv ${requiredTH}">
         ${LOCK_ICON_SVG}
@@ -805,18 +1321,17 @@ function renderBuildings(buildings, townHallLevel, isBusy) {
 
   innerEl.innerHTML = innerHTML;
 
-  // --- OUTER SLOTS CALCULATION ---
+  // --- 2. OUTER RESOURCE FIELDS ---
   const totalUnlockedOuter = Math.min(40, thLvl * 4);
   const builtOuterCount = outerList.length;
   const openOuterCount = Math.max(0, totalUnlockedOuter - builtOuterCount);
-  const lockedOuterCount = 40 - totalUnlockedOuter;
+  const lockedOuterCount = Math.max(0, 40 - totalUnlockedOuter);
 
   document.getElementById("outer-slot-badge").innerHTML = 
     `Built: <strong>${builtOuterCount}</strong> | Unlocked: <strong class="open">${totalUnlockedOuter}</strong> / <strong>40</strong>`;
 
   let outerHTML = outerList.map(b => makeBuildingCard(b, isBusy)).join("");
 
-  // Render open outer slots
   for (let i = 0; i < openOuterCount; i++) {
     outerHTML += `
       <div class="building-card slot-open">
@@ -831,9 +1346,8 @@ function renderBuildings(buildings, townHallLevel, isBusy) {
     `;
   }
 
-  // Render compact locked outer slots with padlock icon
   for (let i = 0; i < lockedOuterCount; i++) {
-    const requiredTH = Math.ceil((totalUnlockedOuter + i + 1) / 4);
+    const requiredTH = Math.max(1, Math.ceil((totalUnlockedOuter + i + 1) / 4));
     outerHTML += `
       <div class="building-card slot-locked" title="Requires Town Hall Lv ${requiredTH}">
         ${LOCK_ICON_SVG}
@@ -893,12 +1407,7 @@ function tickCountdowns() {
   });
 }
 
-/* Building Rule Checks */
 async function startBuildingAction(actionType, id) {
-  // Workers-as-a-resource governs concurrency server-side now — no
-  // more blanket "queue occupied" block. Multiple builds/upgrades can
-  // run at once as long as enough workers are available; the server
-  // rejects with a specific shortfall message otherwise.
   const endpoint = actionType === 'construct' ? '/buildings/construct' : '/buildings/upgrade';
 
   const body = actionType === 'construct'
@@ -919,48 +1428,97 @@ async function startBuildingAction(actionType, id) {
   }
 }
 
-async function refresh() {
+// Helper to safely fetch JSON and log HTML error pages clearly
+async function fetchJsonSafe(url) {
   try {
-    const res = await fetch(`${API_BASE}/cities/${currentCityId}`);
-    const data = await res.json();
-
-    document.getElementById("city-name").textContent = data.city.name;
-    document.getElementById("city-meta").textContent = `(${data.city.x}, ${data.city.y}) · Founded ${new Date(data.city.created_at).toLocaleDateString()}`;
-    document.getElementById("city-loyalty").textContent = data.city.loyalty ?? 100;
-    document.getElementById("city-grievance").textContent = data.city.grievance ?? 0;
-
-    currentGameState.queue = data.queue || [];
-
-    if (data.player) renderPlayerProfile(data.player);
-    if (data.resources) updateTicker(data.resources);
-
-    // Render Warehouse Capacity & Protection Stats
-    if (data.warehouseStats) {
-      document.getElementById("wh-capacity").textContent = formatNumber(data.warehouseStats.capacity);
-      document.getElementById("wh-protected").textContent = formatNumber(data.warehouseStats.protected);
-      document.getElementById("wh-at-risk").textContent = formatNumber(data.warehouseStats.atRisk);
+    const res = await fetch(url);
+    if (!res.ok) {
+      const errorHtml = await res.text();
+      console.error(`❌ HTTP Error ${res.status} at ${url}:`, errorHtml.slice(0, 300));
+      return null;
     }
-
-    const isBusy = false;
-
-    const townHall = (data.buildings || []).find(b => b.building_type_id === 1 || b.building_name === "Town Hall");
-    const townHallLevel = townHall ? townHall.level : 1;
-
-    renderBuildings(data.buildings || [], townHallLevel, isBusy);
-    renderAvailableToBeBuilt(data.availableBuildings || [], isBusy);
-    renderQueue(data.queue || []);
-    tickCountdowns();
-
+    return await res.json();
   } catch (err) {
-    document.getElementById("city-meta").textContent = "Connection lost — retrying…";
+    console.error(`❌ Network or JSON Parse Error at ${url}:`, err);
+    return null;
   }
 }
 
-document.getElementById("tax-rate-input")?.addEventListener("focus", () => { taxInputTouched = true; });
+async function refresh() {
+  try {
+    // 1. Fetch City & Resource Data
+    const data = await fetchJsonSafe(`${API_BASE}/cities/${currentCityId}`);
 
+    // 2. Fetch Buildings Data
+    const buildings = await fetchJsonSafe(`${API_BASE}/buildings/city/${currentCityId}`);
+
+    // 3. Fetch Player Profile Data
+    const player = await fetchJsonSafe(`${API_BASE}/players/city/${currentCityId}`);
+
+    // 4. Fetch active research (drives the Academy building card's busy state)
+    const researchState = await fetchJsonSafe(`${API_BASE}/research?cityId=${currentCityId}`);
+    activeResearch = (researchState && researchState.activeQueue) || null;
+
+    // --- RENDER PANELS ONLY IF DATA IS VALID ---
+
+    // City Header
+    if (data && data.city) {
+  document.getElementById("city-name").textContent = data.city.name || "Capital";
+  document.getElementById("city-meta").textContent = 
+    `(${data.city.x ?? 0}, ${data.city.y ?? 0}) · Founded ${data.city.created_at ? new Date(data.city.created_at).toLocaleDateString() : 'N/A'}`;
+}
+
+// 2. WAREHOUSE DATA WIRING (NEW)
+const whCap = data?.city?.warehouse_capacity ?? data?.resources?.warehouse_capacity ?? data?.warehouse?.capacity ?? 0;
+const whProt = data?.city?.protected_resources ?? data?.resources?.protected_resources ?? data?.warehouse?.protected ?? 0;
+const whRisk = data?.city?.at_risk_resources ?? data?.resources?.at_risk_resources ?? data?.warehouse?.at_risk ?? 0;
+
+if (document.getElementById("wh-capacity")) {
+  document.getElementById("wh-capacity").textContent = formatNumber(whCap);
+}
+if (document.getElementById("wh-protected")) {
+  document.getElementById("wh-protected").textContent = formatNumber(whProt);
+}
+if (document.getElementById("wh-at-risk")) {
+  document.getElementById("wh-at-risk").textContent = formatNumber(whRisk);
+}
+
+    // Queue & Resources
+    if (data && data.queue) {
+      if (typeof currentGameState !== 'undefined') currentGameState.queue = data.queue;
+      renderQueue(data.queue);
+    }
+    if (data && data.resources) updateTicker(data.resources);
+
+    // Player Profile
+    if (player && typeof renderPlayerProfile === 'function') {
+      renderPlayerProfile(player);
+    }
+
+    // Buildings Grid
+    if (Array.isArray(buildings)) {
+      if (typeof currentGameState !== 'undefined') currentGameState.buildings = buildings;
+      
+      const townHall = buildings.find(b => b.building_name === 'Town Hall');
+      const townHallLevel = townHall ? townHall.level : 1;
+
+      renderBuildings(buildings, townHallLevel, false);
+    }
+
+    // Available to Build Options
+    if (data && data.availableToBuild && typeof renderAvailableToBeBuilt === 'function') {
+      renderAvailableToBeBuilt(data.availableToBuild, false);
+    }
+
+  } catch (err) {
+    console.error("Critical error inside refresh():", err);
+  }
+}
+
+// Initial loop triggers
+setInterval(tickCountdowns, 1000);
 refresh();
 setInterval(refresh, 5000);
-setInterval(tickCountdowns, 1000);
 </script>
 
 </body>

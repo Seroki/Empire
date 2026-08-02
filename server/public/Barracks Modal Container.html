@@ -1,0 +1,213 @@
+<!-- BARRACKS MODAL CONTAINER -->
+<div class="modal-overlay" id="barracks-modal" onclick="closeBarracksGui(event)">
+  <div class="game-modal-panel" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2>🏰 Barracks Training Ground</h2>
+      <button class="close-btn" onclick="closeBarracksGui()">&times;</button>
+    </div>
+    
+    <!-- Dynamic Content injected here -->
+    <div id="barracks-content">
+      <p style="font-size: 11px; color: var(--faded); padding: 12px;">Loading Barracks Data...</p>
+    </div>
+  </div>
+</div>
+
+<script>
+let activeBarracksId = null;
+
+async function openBarracksGui(cityId = window.currentCityId, targetBarracksId = null) {
+  const modal = document.getElementById("barracks-modal");
+  const content = document.getElementById("barracks-content");
+  modal.classList.add("visible");
+
+  if (!targetBarracksId) {
+    content.innerHTML = `<p style="font-size: 11px; color: var(--faded); padding: 12px;">Locating Barracks structures in City ${cityId}...</p>`;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/units/barracks?cityId=${cityId}`);
+    const data = await res.json();
+
+    if (res.ok && data.success) {
+      const barracksList = data.barracks || [];
+
+      if (barracksList.length === 0) {
+        content.innerHTML = `<div class="empty-note" style="padding: 12px;">No Barracks constructed in this city yet. Build one from the Inner City plots!</div>`;
+        return;
+      }
+
+      activeBarracksId = targetBarracksId || barracksList[0].id;
+      const availablePop = Number(data.availablePopulation || 0);
+      const allUnits = data.units || [];
+      const queueList = data.queue || [];
+
+      // 1. Facility Selector & Population Banner
+      let html = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin: 8px; background: var(--panel-raised); padding: 6px 8px; border: 1px solid var(--line);">
+          <div>
+            <label style="font-size: 10px; color: var(--brass-dim); text-transform: uppercase;">Facility:</label>
+            <select id="barracks-select" onchange="openBarracksGui(${cityId}, this.value)" style="background: var(--ink); color: var(--parchment); border: 1px solid var(--line); font-family: var(--font-mono); font-size: 11px; padding: 2px 4px; margin-left: 4px;">
+              ${barracksList.map(b => `
+                <option value="${b.id}" ${b.id == activeBarracksId ? 'selected' : ''}>
+                  ${b.name || 'Barracks'} (Lv ${b.level}) #${b.id}
+                </option>
+              `).join('')}
+            </select>
+          </div>
+          <div style="font-size: 11px;">
+            <span style="color: var(--faded);">Idle Pop:</span>
+            <strong style="color: ${availablePop > 0 ? 'var(--green)' : 'var(--rust)'};">${formatNumber(availablePop)}</strong>
+          </div>
+        </div>
+      `;
+
+      // 2. Interactive Unit Table
+      if (allUnits.length > 0) {
+        html += `
+          <table style="width:100%; border-collapse: collapse;">
+            <thead>
+              <tr style="border-bottom: 1px solid var(--line); text-align: left;">
+                <th style="padding: 6px;">UNIT</th>
+                <th style="padding: 6px;">STATS & COSTS</th>
+                <th style="padding: 6px; text-align: center;">OWNED</th>
+                <th style="padding: 6px;">RECRUIT ORDER</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+
+        allUnits.forEach(u => {
+          const unlocked = u.isAvailable !== false;
+          const popCostPerUnit = Math.max(1, Number(u.population_cost || u.pop_cost || 1));
+          const maxTrainableByPop = Number(u.maxTrainable ?? Math.floor(availablePop / popCostPerUnit));
+
+          html += `
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); ${!unlocked ? 'opacity: 0.4;' : ''}">
+              <td style="padding: 6px;">
+                <strong style="color: var(--parchment);">${u.name}</strong>
+                <div style="font-size: 9px; color: var(--faded);">
+                  ${unlocked ? `👥 Pop: ${popCostPerUnit}` : `<span style="color:var(--rust);">Req. Barracks Lv ${u.required_barracks_level}</span>`}
+                </div>
+              </td>
+              <td style="padding: 6px; font-size: 10px; color: var(--faded);">
+                <div>⚔️ ${u.attack || 0} | 🛡️ ${u.defense || 0}</div>
+                <div style="font-size: 9px; color: var(--brass-dim); margin-top: 2px;">
+                  🌾 ${formatNumber(u.food_cost || 0)} | 🪵 ${formatNumber(u.wood_cost || 0)} | 🪨 ${formatNumber(u.stone_cost || 0)} | ⛏️ ${formatNumber(u.iron_cost || 0)} | 🪙 ${formatNumber(u.gold_cost || 0)}
+                </div>
+              </td>
+              <td style="padding: 6px; font-size: 11px; font-weight: 600; text-align: center;">
+                ${formatNumber(u.owned || 0)}
+              </td>
+              <td style="padding: 6px;">
+                ${unlocked ? `
+                  <div style="display: flex; flex-direction: column; gap: 2px;">
+                    <div style="display: flex; gap: 4px; align-items: center;">
+                      <input type="number" 
+                             id="train-qty-${u.code}" 
+                             min="1" 
+                             value="1" 
+                             style="width: 50px; background: var(--ink); border: 1px solid var(--line); color: var(--parchment); font-family: var(--font-mono); font-size: 10px; text-align: center; padding: 2px;">
+                      <button class="btn-edit-inline" style="padding: 2px 4px; font-size: 9px;" onclick="setMaxTrainable('${u.code}', ${maxTrainableByPop})">Max</button>
+                      <button class="action-btn" style="padding: 2px 8px; font-size: 9px;" onclick="submitTrainOrder('${u.code}')">
+                        Train
+                      </button>
+                    </div>
+                    <div style="font-size: 8px; color: var(--faded);">Max by Pop: <span style="color: var(--brass);">${formatNumber(maxTrainableByPop)}</span></div>
+                  </div>
+                ` : `
+                  <span style="font-size: 9px; color: var(--rust);">Locked</span>
+                `}
+              </td>
+            </tr>
+          `;
+        });
+
+        html += `</tbody></table>`;
+      } else {
+        html += `<div class="empty-note" style="padding: 12px;">No unit definitions available.</div>`;
+      }
+
+      // 3. Active Recruitment Queue Section
+      if (queueList.length > 0) {
+        html += `
+          <div style="margin-top: 12px; border-top: 1px solid var(--line); padding-top: 8px;">
+            <h4 style="font-size: 11px; color: var(--brass); margin: 0 0 6px 8px; text-transform: uppercase;">Active Recruitment Queue</h4>
+            <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
+              <thead>
+                <tr style="text-align: left; color: var(--faded); border-bottom: 1px solid rgba(255,255,255,0.05);">
+                  <th style="padding: 4px 8px;">Unit</th>
+                  <th style="padding: 4px 8px;">Qty</th>
+                  <th style="padding: 4px 8px;">Completes At</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${queueList.map(q => `
+                  <tr style="border-bottom: 1px solid rgba(255,255,255,0.02);">
+                    <td style="padding: 4px 8px; color: var(--parchment);">${q.name}</td>
+                    <td style="padding: 4px 8px; font-weight: 600;">${formatNumber(q.quantity)}</td>
+                    <td style="padding: 4px 8px; color: var(--brass-dim);">${new Date(q.finish_at).toLocaleTimeString()}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+
+      content.innerHTML = html;
+    } else {
+      content.innerHTML = `<div style="color: var(--rust); padding: 12px;">${data.error || "Failed to load Barracks."}</div>`;
+    }
+  } catch (err) {
+    console.error("Barracks GUI Error:", err);
+    content.innerHTML = `<div style="color: var(--rust); padding: 12px;">Could not connect to game server.</div>`;
+  }
+}
+
+function setMaxTrainable(unitCode, maxAmount) {
+  const input = document.getElementById(`train-qty-${unitCode}`);
+  if (input) input.value = Math.max(1, maxAmount);
+}
+
+async function submitTrainOrder(unitCode) {
+  const qtyInput = document.getElementById(`train-qty-${unitCode}`);
+  const quantity = Math.max(1, Number(qtyInput?.value) || 1);
+
+  if (!activeBarracksId) {
+    if (typeof showErrorModal === "function") showErrorModal("No Barracks selected.");
+    else alert("No Barracks selected.");
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/units/train`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        cityId: window.currentCityId,
+        barracksId: activeBarracksId,
+        unitCode: unitCode,
+        quantity: quantity
+      })
+    });
+
+    const result = await res.json();
+    if (res.ok && result.success) {
+      openBarracksGui(window.currentCityId, activeBarracksId);
+      if (typeof refresh === "function") refresh();
+    } else {
+      if (typeof showErrorModal === "function") showErrorModal(result.error || "Training order rejected.");
+      else alert(result.error || "Training order rejected.");
+    }
+  } catch (err) {
+    if (typeof showErrorModal === "function") showErrorModal("Could not reach recruitment server.");
+    else alert("Could not reach recruitment server.");
+  }
+}
+
+function closeBarracksGui(event) {
+  if (event && event.target !== event.currentTarget) return;
+  document.getElementById("barracks-modal").classList.remove("visible");
+}
+</script>

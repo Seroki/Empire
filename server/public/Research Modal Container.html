@@ -10,7 +10,10 @@
     <div class="tab-bar">
       <button class="tab-btn active" onclick="switchDiscipline('economy')">Economy</button>
       <button class="tab-btn" onclick="switchDiscipline('military')">Military</button>
-      <button class="tab-btn" onclick="switchDiscipline('logistics')">Logistics</button>
+      <button class="tab-btn" onclick="switchDiscipline('construction')">Construction</button>
+      <button class="tab-btn" onclick="switchDiscipline('intelligence')">Intelligence</button>
+      <button class="tab-btn" onclick="switchDiscipline('movement')">Movement</button>
+      <button class="tab-btn" onclick="switchDiscipline('defense')">Defense</button>
     </div>
 
     <!-- Tech Grid -->
@@ -35,7 +38,7 @@
   }
   .modal-content { background: #222; color: #fff; width: 800px; padding: 20px; border-radius: 8px; }
   .modal-header { display: flex; justify-content: space-between; align-items: center; }
-  .tab-bar { display: flex; gap: 10px; margin: 15px 0; border-bottom: 1px solid #444; }
+  .tab-bar { display: flex; gap: 10px; margin: 15px 0; border-bottom: 1px solid #444; flex-wrap: wrap; }
   .tab-btn { background: none; border: none; color: #aaa; padding: 10px 15px; cursor: pointer; font-size: 16px; }
   .tab-btn.active { color: #fff; border-bottom: 2px solid #e2b041; font-weight: bold; }
   .tech-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; max-height: 400px; overflow-y: auto; }
@@ -83,7 +86,9 @@ function closeResearchGui() {
 function switchDiscipline(discipline) {
   currentDiscipline = discipline;
   document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-  event.target.classList.add('active');
+  if (event && event.target) {
+    event.target.classList.add('active');
+  }
   renderTechs();
 }
 
@@ -98,28 +103,40 @@ function renderTechs() {
   const activeQueue = researchData.activeQueue;
 
   Object.entries(researchData.technologies).forEach(([code, tech]) => {
-    // Filter discipline (assuming tech.discipline exists; defaults to economy if missing)
+    // Filter discipline
     const discipline = tech.discipline || 'economy';
     if (discipline !== currentDiscipline) return;
 
-    const targetLevel = tech.globalLevel + 1;
+    const currentLevel = tech.globalLevel || 0;
+    const targetLevel = currentLevel + 1;
     const reqAcademy = tech.requiredAcademyLevel || 1;
     const isAcademyMet = academyLevel >= reqAcademy;
 
     const card = document.createElement('div');
     card.className = `tech-card ${!isAcademyMet ? 'locked' : ''}`;
 
+    let prereqText = '';
+    if (tech.prerequisite) {
+      const prereqCode = tech.prerequisite.tech;
+      const prereqName = researchData.technologies[prereqCode]?.name || prereqCode;
+      prereqText = `<br/><small>Requires ${prereqName} Level ${tech.prerequisite.level}</small>`;
+    }
+
+    const costList = tech.nextLevelCost ? `
+      Food: ${tech.nextLevelCost.food || 0} | Wood: ${tech.nextLevelCost.wood || 0} | 
+      Stone: ${tech.nextLevelCost.stone || 0} | Iron: ${tech.nextLevelCost.iron || 0} | 
+      Gold: ${tech.nextLevelCost.gold || 0}
+    ` : 'None';
+
     card.innerHTML = `
-      <h3>${tech.name} <small>(Lvl ${tech.globalLevel})</small></h3>
+      <h3>${tech.name} <small>(Lvl ${currentLevel})</small></h3>
       <p>${tech.description || 'Enhances city capabilities.'}</p>
       
       <div class="cost-list">
         <strong>Next Level (${targetLevel}) Cost:</strong><br/>
-        Food: ${tech.nextLevelCost.food} | Wood: ${tech.nextLevelCost.wood} | 
-        Stone: ${tech.nextLevelCost.stone} | Iron: ${tech.nextLevelCost.iron} | 
-        Gold: ${tech.nextLevelCost.gold}
+        ${costList}
       </div>
-      <p><small>Requires Academy Level: ${reqAcademy}</small></p>
+      <p><small>Requires Academy Level: ${reqAcademy}</small>${prereqText}</p>
 
       <button class="research-btn" onclick="attemptResearch('${code}', ${targetLevel}, ${reqAcademy})">
         ${activeQueue?.tech_code === code ? 'Researching...' : 'Research'}
@@ -133,8 +150,29 @@ function renderTechs() {
 // 3. Client Validation & Requirement Warning Pop-up
 function attemptResearch(techCode, targetLevel, requiredAcademyLevel) {
   const academyLevel = researchData.academyLevel || 0;
+  const tech = researchData.technologies ? researchData.technologies[techCode] : null;
 
-  // Check 1: Academy Level
+  if (!tech) {
+    showRequirementPopup('Error', 'Invalid technology code.');
+    return;
+  }
+
+  // Check 1: Max Level
+  if (tech.maxLevel && targetLevel > tech.maxLevel) {
+    showRequirementPopup('Max Level Reached', `${tech.name} is already at its maximum level (${tech.maxLevel}).`);
+    return;
+  }
+
+  // Check 2: Active Queue
+  if (researchData.activeQueue) {
+    showRequirementPopup(
+      'Research Queue Busy',
+      `You are already researching ${researchData.activeQueue.tech_code}. Wait until it finishes.`
+    );
+    return;
+  }
+
+  // Check 3: Academy Level
   if (academyLevel < requiredAcademyLevel) {
     showRequirementPopup(
       'Academy Level Too Low',
@@ -143,16 +181,40 @@ function attemptResearch(techCode, targetLevel, requiredAcademyLevel) {
     return;
   }
 
-  // Check 2: Active Queue
-  if (researchData.activeQueue) {
-    showRequirementPopup(
-      'Research Queue Busy',
-      `You are already researching ${researchData.activeQueue.tech_code}. Wait until it finishes or speed it up.`
-    );
-    return;
+  // Check 4: Prerequisite Tech
+  if (tech.prerequisite) {
+    const prereqCode = tech.prerequisite.tech;
+    const prereqTech = researchData.technologies[prereqCode];
+    const prereqCurrentLevel = prereqTech ? (prereqTech.globalLevel || 0) : 0;
+    
+    if (prereqCurrentLevel < tech.prerequisite.level) {
+      const prereqName = prereqTech ? prereqTech.name : prereqCode;
+      showRequirementPopup(
+        'Prerequisite Not Met',
+        `Requires ${prereqName} Level ${tech.prerequisite.level}. (Current: Level ${prereqCurrentLevel})`
+      );
+      return;
+    }
   }
 
-  // If checks pass, call start endpoint
+  // Check 5: Resources
+  if (tech.nextLevelCost && researchData.resources) {
+    const res = researchData.resources;
+    const cost = tech.nextLevelCost;
+
+    if (
+      (cost.food && res.food < cost.food) ||
+      (cost.wood && res.wood < cost.wood) ||
+      (cost.stone && res.stone < cost.stone) ||
+      (cost.iron && res.iron < cost.iron) ||
+      (cost.gold && res.gold < cost.gold)
+    ) {
+      showRequirementPopup('Insufficient Resources', 'You do not have enough resources for this research.');
+      return;
+    }
+  }
+
+  // If all checks pass, send request
   sendStartResearchRequest(techCode, targetLevel);
 }
 
