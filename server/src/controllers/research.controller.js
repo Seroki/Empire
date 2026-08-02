@@ -1,16 +1,32 @@
 const researchService = require('../services/research.service');
+const pool = require('../database/db');
+
+// This app has no real login/session system yet — "the player" is resolved
+// from the city they're acting on, the same way units.service.js does it.
+async function resolvePlayerIdFromCity(cityId) {
+  const result = await pool.query(`SELECT owner_id FROM cities WHERE id = $1`, [cityId]);
+  if (result.rows.length === 0) {
+    throw new Error("City not found");
+  }
+  return result.rows[0].owner_id;
+}
 
 // GET /api/research?cityId=1
 async function getResearchTree(req, res) {
   try {
-    const playerId = req.user.id; // derived from auth middleware
     const cityId = req.query.cityId ? parseInt(req.query.cityId, 10) : null;
+
+    if (!cityId) {
+      return res.status(400).json({ success: false, error: 'cityId is required.' });
+    }
+
+    const playerId = await resolvePlayerIdFromCity(cityId);
 
     // 1. First, resolve any completed research projects lazily
     await researchService.resolveCompletedResearch(playerId);
 
     // 2. Fetch player's current completed tech levels
-    const playerTechsRes = await req.db.query(
+    const playerTechsRes = await pool.query(
       `SELECT tech_code, level FROM player_researches WHERE player_id = $1`,
       [playerId]
     );
@@ -21,27 +37,24 @@ async function getResearchTree(req, res) {
     }
 
     // 3. Fetch active queue project
-    const activeQueueRes = await req.db.query(
+    const activeQueueRes = await pool.query(
       `SELECT * FROM research_queue WHERE player_id = $1 AND status = 'IN_PROGRESS' LIMIT 1`,
       [playerId]
     );
     const activeQueue = activeQueueRes.rows[0] || null;
 
-    // 4. Fetch local city Academy level if cityId provided
-    let academyLevel = 0;
-    if (cityId) {
-      const academyRes = await req.db.query(
-        `SELECT level FROM city_buildings WHERE city_id = $1 AND building_type_id = 6`,
-        [cityId]
-      );
-      academyLevel = academyRes.rows[0]?.level || 0;
-    }
+    // 4. Fetch local city Academy level
+    const academyRes = await pool.query(
+      `SELECT level FROM city_buildings WHERE city_id = $1 AND building_type_id = 6`,
+      [cityId]
+    );
+    const academyLevel = academyRes.rows[0]?.level || 0;
 
     // 5. Build response object combining global levels and effective levels
     const tree = {};
     for (const [code, config] of Object.entries(researchService.TECH_DEFINITIONS)) {
       const globalLevel = playerTechMap[code] || 0;
-      const effectiveLevel = cityId ? researchService.getEffectiveTechLevel(globalLevel, academyLevel) : globalLevel;
+      const effectiveLevel = researchService.getEffectiveTechLevel(globalLevel, academyLevel);
 
       tree[code] = {
         ...config,
@@ -71,12 +84,13 @@ async function getResearchTree(req, res) {
 // POST /api/research/start
 async function startResearch(req, res) {
   try {
-    const playerId = req.user.id;
     const { cityId, techCode, targetLevel } = req.body;
 
     if (!cityId || !techCode || !targetLevel) {
       return res.status(400).json({ success: false, error: 'Missing cityId, techCode, or targetLevel.' });
     }
+
+    const playerId = await resolvePlayerIdFromCity(cityId);
 
     const queueItem = await researchService.startResearch(
       playerId,
