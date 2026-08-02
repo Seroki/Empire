@@ -1,4 +1,10 @@
-const express = require("express");
+const express = require('express');
+const cors = require('cors'); // <--- 1. Import cors
+
+const app = express();
+
+// 2. Enable CORS for all origins (or specifically http://localhost:3000)
+app.use(cors());
 const router = express.Router();
 
 const playerService = require("../services/player.service");
