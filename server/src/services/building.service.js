@@ -1,4 +1,4 @@
-const db = require("../database/db");
+const pool = require("../database/db");
 
 // Must match the same constants in city.service.js
 const STARTING_POPULATION = 200;
@@ -9,14 +9,8 @@ const GOLD_PER_WORKER_PER_HOUR = 10;
 // reserves this many workers until it completes.
 const WORKERS_PER_LEVEL = 100;
 
-
 // Locks and returns city_resources with elapsed production applied.
-// Only gold (population/tax-driven) accrues continuously here —
-// food/wood/stone/iron come from Resource Fields, which store their
-// own production locally and require manual collection
-// (see city.service.js collectResource / attachFieldStorage).
 async function getSettledResources(client, cityId) {
-
     const resourceResult = await client.query(
         `
         SELECT *
@@ -64,9 +58,7 @@ async function getSettledResources(client, cityId) {
     };
 }
 
-
-// How many workers are currently tied up in this city's active
-// construction/upgrade queue.
+// How many workers are currently tied up in this city's active construction queue
 async function getReservedWorkers(client, cityId) {
     const result = await client.query(
         `
@@ -79,10 +71,6 @@ async function getReservedWorkers(client, cityId) {
     return Number(result.rows[0].reserved);
 }
 
-
-// Builds a clear, specific message listing exactly which resources
-// (and how much) are short, so the player can plan ahead rather than
-// getting a flat "not enough resources".
 function buildShortfallMessage(resources, cost, workerCost, availableWorkers) {
     const shortfalls = [];
 
@@ -109,20 +97,12 @@ function buildShortfallMessage(resources, cost, workerCost, availableWorkers) {
     return `Not enough resources. Still need: ${shortfalls.join(", ")}.`;
 }
 
-
 async function startUpgrade(cityId, buildingId) {
-
-    const client = await db.connect();
+    const client = await pool.connect();
 
     try {
-
         await client.query("BEGIN");
 
-
-        // Get current building by its specific instance id — not by
-        // type, since a city can have multiple buildings of the same
-        // type (e.g. two Barracks) and each needs to be targetable
-        // individually.
         const buildingResult = await client.query(
             `
             SELECT *
@@ -130,26 +110,17 @@ async function startUpgrade(cityId, buildingId) {
             WHERE id = $1
             AND city_id = $2
             `,
-            [
-                buildingId,
-                cityId
-            ]
+            [buildingId, cityId]
         );
-
 
         if (buildingResult.rows.length === 0) {
             throw new Error("Building not found");
         }
 
-
         const building = buildingResult.rows[0];
         const buildingTypeId = building.building_type_id;
-
-
         const nextLevel = building.level + 1;
 
-
-        // Get upgrade cost
         const levelResult = await client.query(
             `
             SELECT *
@@ -157,18 +128,13 @@ async function startUpgrade(cityId, buildingId) {
             WHERE building_type_id = $1
             AND level = $2
             `,
-            [
-                buildingTypeId,
-                nextLevel
-            ]
+            [buildingTypeId, nextLevel]
         );
 
         if (levelResult.rows.length === 0) {
             throw new Error("Maximum level reached");
         }
 
-
-        // Capping non-Town-Hall building upgrades to the Town Hall's level
         if (buildingTypeId !== 1) { // 1 = Town Hall
             const thResult = await client.query(
                 `SELECT level FROM city_buildings WHERE city_id = $1 AND building_type_id = 1`,
@@ -181,16 +147,9 @@ async function startUpgrade(cityId, buildingId) {
             }
         }
 
-
         const upgrade = levelResult.rows[0];
-
-
-        // Get resources, with elapsed production settled first
         const resources = await getSettledResources(client, cityId);
 
-        // Workers are a reusable resource: reserved while queued,
-        // automatically freed when the queue item completes (since
-        // it's simply removed from construction_queue).
         const workerCost = WORKERS_PER_LEVEL * nextLevel;
         const reservedWorkers = await getReservedWorkers(client, cityId);
         const availableWorkers = resources.workers - reservedWorkers;
@@ -206,23 +165,18 @@ async function startUpgrade(cityId, buildingId) {
             throw new Error(buildShortfallMessage(resources, upgrade, workerCost, availableWorkers));
         }
 
-
-        // Spend resources (absolute values, since we already settled
-        // elapsed production above)
         await client.query(
             `
             UPDATE city_resources
-
             SET
-            food = $1,
-            wood = $2,
-            stone = $3,
-            iron = $4,
-            gold = $5,
-            workers = $6,
-            population = $7,
-            updated_at = NOW()
-
+                food = $1,
+                wood = $2,
+                stone = $3,
+                iron = $4,
+                gold = $5,
+                workers = $6,
+                population = $7,
+                updated_at = NOW()
             WHERE city_id = $8
             `,
             [
@@ -237,8 +191,6 @@ async function startUpgrade(cityId, buildingId) {
             ]
         );
 
-
-        // Create construction timer, reserving the workers it uses
         await client.query(
             `
             INSERT INTO construction_queue
@@ -249,7 +201,6 @@ async function startUpgrade(cityId, buildingId) {
                 finish_time,
                 workers_used
             )
-
             VALUES
             (
                 $1,
@@ -268,9 +219,7 @@ async function startUpgrade(cityId, buildingId) {
             ]
         );
 
-
         await client.query("COMMIT");
-
 
         return {
             building: buildingId,
@@ -280,40 +229,27 @@ async function startUpgrade(cityId, buildingId) {
             workersReserved: workerCost
         };
 
-
     } catch(error) {
-
         await client.query("ROLLBACK");
         throw error;
-
     } finally {
-
         client.release();
-
     }
-
 }
 
-
 async function constructBuilding(cityId, buildingTypeId) {
-
-    const client = await db.connect();
+    const client = await pool.connect();
 
     try {
-
         await client.query("BEGIN");
 
-
-        // Get building type definition
         const typeResult = await client.query(
             `
             SELECT *
             FROM building_types
             WHERE id = $1
             `,
-            [
-                buildingTypeId
-            ]
+            [buildingTypeId]
         );
 
         if (typeResult.rows.length === 0) {
@@ -322,8 +258,6 @@ async function constructBuilding(cityId, buildingTypeId) {
 
         const buildingType = typeResult.rows[0];
 
-
-        // Get all existing buildings in this city (with type info)
         const existingResult = await client.query(
             `
             SELECT cb.*, bt.slot_pool
@@ -332,15 +266,11 @@ async function constructBuilding(cityId, buildingTypeId) {
                 ON cb.building_type_id = bt.id
             WHERE cb.city_id = $1
             `,
-            [
-                cityId
-            ]
+            [cityId]
         );
 
         const existingBuildings = existingResult.rows;
 
-
-        // Singleton check
         if (buildingType.is_unique) {
             const alreadyBuilt = existingBuildings.some(
                 b => b.building_type_id === buildingType.id
@@ -350,8 +280,6 @@ async function constructBuilding(cityId, buildingTypeId) {
             }
         }
 
-
-        // Prerequisite building check
         if (buildingType.requires_building_id) {
             const hasPrereq = existingBuildings.some(
                 b => b.building_type_id === buildingType.requires_building_id
@@ -361,8 +289,6 @@ async function constructBuilding(cityId, buildingTypeId) {
             }
         }
 
-
-        // Town Hall level check
         const townHall = existingBuildings.find(b => b.building_type_id === 1);
         const townHallLevel = townHall ? townHall.level : 1;
 
@@ -370,8 +296,6 @@ async function constructBuilding(cityId, buildingTypeId) {
             throw new Error(`Requires Town Hall level ${buildingType.unlock_th_level}`);
         }
 
-
-        // Wall level check
         const walls = existingBuildings.find(b => b.building_type_id === 3);
         const wallLevel = walls ? walls.level : 0;
 
@@ -379,34 +303,25 @@ async function constructBuilding(cityId, buildingTypeId) {
             throw new Error(`Requires Wall level ${buildingType.unlock_wall_level}`);
         }
 
-
-        // Slot capacity check
         if (buildingType.slot_pool === "inner") {
-
             const innerUsed = existingBuildings.filter(b => b.slot_pool === "inner").length;
             if (innerUsed >= 32) {
                 throw new Error("No inner city slots available");
             }
-
         } else if (buildingType.slot_pool === "outer") {
-
             const outerTotal = Math.min(40, 13 + 3 * (townHallLevel - 1));
             const outerUsed = existingBuildings.filter(b => b.slot_pool === "outer").length;
             if (outerUsed >= outerTotal) {
                 throw new Error("No outer field slots available");
             }
-
         } else if (buildingType.slot_pool === "wall_fortification") {
-
             const capacityResult = await client.query(
                 `
                 SELECT capacity
                 FROM wall_fortification_capacity
                 WHERE wall_level = $1
                 `,
-                [
-                    wallLevel
-                ]
+                [wallLevel]
             );
 
             const capacity = capacityResult.rows.length > 0
@@ -420,8 +335,6 @@ async function constructBuilding(cityId, buildingTypeId) {
             }
         }
 
-
-        // Limit total additional buildings at Town Hall level 1
         if (townHallLevel === 1) {
             const additionalBuildingCount = existingBuildings.filter(b => b.building_type_id !== 1).length;
             if (additionalBuildingCount >= 3) {
@@ -429,8 +342,6 @@ async function constructBuilding(cityId, buildingTypeId) {
             }
         }
 
-
-        // Get level 1 cost
         const levelResult = await client.query(
             `
             SELECT *
@@ -438,9 +349,7 @@ async function constructBuilding(cityId, buildingTypeId) {
             WHERE building_type_id = $1
             AND level = 1
             `,
-            [
-                buildingTypeId
-            ]
+            [buildingTypeId]
         );
 
         if (levelResult.rows.length === 0) {
@@ -448,13 +357,8 @@ async function constructBuilding(cityId, buildingTypeId) {
         }
 
         const cost = levelResult.rows[0];
-
-
-        // Get resources, with elapsed production settled first
         const resources = await getSettledResources(client, cityId);
 
-        // Workers are a reusable resource: reserved while queued,
-        // automatically freed when the queue item completes.
         const workerCost = WORKERS_PER_LEVEL * 1;
         const reservedWorkers = await getReservedWorkers(client, cityId);
         const availableWorkers = resources.workers - reservedWorkers;
@@ -470,23 +374,18 @@ async function constructBuilding(cityId, buildingTypeId) {
             throw new Error(buildShortfallMessage(resources, cost, workerCost, availableWorkers));
         }
 
-
-        // Spend resources (absolute values, since we already settled
-        // elapsed production above)
         await client.query(
             `
             UPDATE city_resources
-
             SET
-            food = $1,
-            wood = $2,
-            stone = $3,
-            iron = $4,
-            gold = $5,
-            workers = $6,
-            population = $7,
-            updated_at = NOW()
-
+                food = $1,
+                wood = $2,
+                stone = $3,
+                iron = $4,
+                gold = $5,
+                workers = $6,
+                population = $7,
+                updated_at = NOW()
             WHERE city_id = $8
             `,
             [
@@ -501,10 +400,6 @@ async function constructBuilding(cityId, buildingTypeId) {
             ]
         );
 
-
-        // Create the building at level 0 (under construction) and
-        // queue it to complete after build_seconds, reserving the
-        // workers it uses
         const newBuildingResult = await client.query(
             `
             INSERT INTO city_buildings
@@ -512,10 +407,7 @@ async function constructBuilding(cityId, buildingTypeId) {
             VALUES ($1, $2, 0, 0, 0)
             RETURNING *
             `,
-            [
-                cityId,
-                buildingTypeId
-            ]
+            [cityId, buildingTypeId]
         );
 
         const newBuilding = newBuildingResult.rows[0];
@@ -534,9 +426,7 @@ async function constructBuilding(cityId, buildingTypeId) {
             ]
         );
 
-
         await client.query("COMMIT");
-
 
         return {
             building: newBuilding,
@@ -545,38 +435,27 @@ async function constructBuilding(cityId, buildingTypeId) {
             workersReserved: workerCost
         };
 
-
     } catch(error) {
-
         await client.query("ROLLBACK");
         throw error;
-
     } finally {
-
         client.release();
-
     }
-
 }
 
-
 async function processCompletedConstruction(cityId) {
-
-    const completedResult = await db.query(
+    const completedResult = await pool.query(
         `
         SELECT *
         FROM construction_queue
         WHERE city_id = $1
         AND finish_time <= NOW()
         `,
-        [
-            cityId
-        ]
+        [cityId]
     );
 
     for (const item of completedResult.rows) {
-
-        await db.query(
+        await pool.query(
             `
             UPDATE city_buildings
             SET level = $1
@@ -588,22 +467,18 @@ async function processCompletedConstruction(cityId) {
             ]
         );
 
-        await db.query(
+        await pool.query(
             `
             DELETE FROM construction_queue
             WHERE id = $1
             `,
-            [
-                item.id
-            ]
+            [item.id]
         );
     }
 }
 
-
 async function getQueue(cityId) {
-
-    const result = await db.query(
+    const result = await pool.query(
         `
         SELECT
             cq.id,
@@ -622,20 +497,15 @@ async function getQueue(cityId) {
         WHERE cq.city_id = $1
         ORDER BY cq.finish_time
         `,
-        [
-            cityId
-        ]
+        [cityId]
     );
 
     return result.rows;
 }
 
-
 async function getAvailableBuildings(cityId) {
-    const client = await db.connect();
+    const client = await pool.connect();
     try {
-        // Fetch current buildings to determine TH Level, Wall level,
-        // and built prerequisites
         const existingResult = await client.query(
             `SELECT building_type_id, level FROM city_buildings WHERE city_id = $1`,
             [cityId]
@@ -650,7 +520,6 @@ async function getAvailableBuildings(cityId) {
 
         const builtTypeIds = new Set(existingBuildings.map(b => b.building_type_id));
 
-        // Get all building types unlockable at or below current TH level
         const availableTypesResult = await client.query(
             `
             SELECT bt.*, bl.food_cost, bl.wood_cost, bl.stone_cost, bl.iron_cost, bl.gold_cost, bl.build_seconds
@@ -661,8 +530,6 @@ async function getAvailableBuildings(cityId) {
             [townHallLevel]
         );
 
-        // Filter out singletons already constructed, buildings missing
-        // their prerequisite, and buildings that need a higher Wall level
         const buildable = availableTypesResult.rows.filter(bt => {
             if (bt.is_unique && builtTypeIds.has(bt.id)) return false;
             if (bt.requires_building_id && !builtTypeIds.has(bt.requires_building_id)) return false;
@@ -675,6 +542,182 @@ async function getAvailableBuildings(cityId) {
         client.release();
     }
 }
+async function collectResource(cityId, buildingId) {
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+
+        // 1. Get building data along with its level production stats
+        const bRes = await client.query(
+            `
+            SELECT 
+                cb.*, 
+                bt.name AS building_name, 
+                bt.slot_pool,
+                bl.food_per_hour,
+                bl.wood_per_hour,
+                bl.stone_per_hour,
+                bl.iron_per_hour,
+                bl.gold_per_hour,
+                bl.storage_capacity AS field_capacity
+            FROM city_buildings cb
+            JOIN building_types bt ON cb.building_type_id = bt.id
+            LEFT JOIN building_levels bl 
+                ON bl.building_type_id = cb.building_type_id 
+                AND bl.level = cb.level
+            WHERE cb.id = $1 AND cb.city_id = $2
+            `,
+            [buildingId, cityId]
+        );
+
+        if (bRes.rows.length === 0) {
+            throw new Error("Building not found");
+        }
+
+        const building = bRes.rows[0];
+
+        if (building.slot_pool !== 'outer') {
+            throw new Error("Only outer resource fields can be collected");
+        }
+
+        // 2. Calculate elapsed production
+        const now = Date.now();
+        const lastCollected = new Date(building.last_collected_at || building.created_at || now).getTime();
+        const hoursElapsed = Math.max(0, (now - lastCollected) / 3600000);
+
+        const prodRate = Number(
+            building.food_per_hour || 
+            building.wood_per_hour || 
+            building.stone_per_hour || 
+            building.iron_per_hour || 
+            building.gold_per_hour || 
+            (building.level || 1) * 100
+        );
+
+        const fieldCap = Number(building.field_capacity) || 10000;
+        const totalAccrued = Math.min(
+            Math.round(Number(building.stored_resource || 0) + (hoursElapsed * prodRate)),
+            fieldCap
+        );
+
+        if (totalAccrued <= 0) {
+            throw new Error("No resources available to collect yet");
+        }
+
+        // 3. Map building name to target resource type in city_resources
+        let resourceType = 'food';
+        const nameLower = building.building_name.toLowerCase();
+        if (nameLower.includes('sawmill') || nameLower.includes('wood')) resourceType = 'wood';
+        else if (nameLower.includes('quarry') || nameLower.includes('stone')) resourceType = 'stone';
+        else if (nameLower.includes('iron')) resourceType = 'iron';
+        else if (nameLower.includes('mine') || nameLower.includes('gold')) resourceType = 'gold';
+
+        // 4. Calculate total Warehouse capacity across the city
+        const whCapRes = await client.query(
+            `
+            SELECT COALESCE(SUM(bl.storage_capacity), 10000) AS total_warehouse_cap
+            FROM city_buildings cb
+            JOIN building_types bt ON cb.building_type_id = bt.id
+            JOIN building_levels bl ON bl.building_type_id = cb.building_type_id AND bl.level = cb.level
+            WHERE cb.city_id = $1 AND bt.name = 'Warehouse'
+            `,
+            [cityId]
+        );
+
+        const warehouseCap = Number(whCapRes.rows[0]?.total_warehouse_cap || 10000);
+
+        // 5. Fetch current resources with row lock
+        const currRes = await client.query(
+            `SELECT * FROM city_resources WHERE city_id = $1 FOR UPDATE`,
+            [cityId]
+        );
+
+        const currentAmount = Number(currRes.rows[0][resourceType] || 0);
+        const newAmount = Math.min(currentAmount + totalAccrued, warehouseCap);
+        const actualCollected = newAmount - currentAmount;
+
+        // 6. Update city_resources and reset building's local storage timer
+        await client.query(
+            `UPDATE city_resources SET ${resourceType} = $1, updated_at = NOW() WHERE city_id = $2`,
+            [newAmount, cityId]
+        );
+
+        await client.query(
+            `UPDATE city_buildings SET stored_resource = 0, last_collected_at = NOW() WHERE id = $1`,
+            [buildingId]
+        );
+
+        await client.query("COMMIT");
+
+        return {
+            buildingId,
+            resourceType,
+            collected: actualCollected,
+            newTotal: newAmount,
+            warehouseCap
+        };
+
+    } catch (err) {
+        await client.query("ROLLBACK");
+        throw err;
+    } finally {
+        client.release();
+    }
+}
+async function getCityBuildings(cityId) {
+    const result = await pool.query(
+        `
+        SELECT 
+            cb.*, 
+            bt.name AS building_name, 
+            bt.slot_pool,
+            bl.food_per_hour,
+            bl.wood_per_hour,
+            bl.stone_per_hour,
+            bl.iron_per_hour,
+            bl.gold_per_hour,
+            bl.storage_capacity
+        FROM city_buildings cb
+        JOIN building_types bt ON cb.building_type_id = bt.id
+        LEFT JOIN building_levels bl 
+            ON bl.building_type_id = cb.building_type_id 
+            AND bl.level = cb.level
+        WHERE cb.city_id = $1
+        ORDER BY cb.id ASC
+        `,
+        [cityId]
+    );
+
+    const now = Date.now();
+
+    return result.rows.map(b => {
+        if (b.slot_pool === 'outer') {
+            // Determine production rate based on whichever resource column is non-zero
+            const prodRate = Number(
+                b.food_per_hour || 
+                b.wood_per_hour || 
+                b.stone_per_hour || 
+                b.iron_per_hour || 
+                b.gold_per_hour || 
+                (b.level || 1) * 100 // Safe fallback
+            );
+
+            const lastCollected = new Date(b.last_collected_at || b.created_at || now).getTime();
+            const hoursElapsed = Math.max(0, (now - lastCollected) / 3600000);
+            
+            const maxCap = Number(b.storage_capacity) || 10000;
+            const accumulated = Number(b.stored_resource || 0) + (hoursElapsed * prodRate);
+
+            return {
+                ...b,
+                production_rate: prodRate,
+                max_capacity: maxCap,
+                stored_resource: Math.min(Math.round(accumulated), maxCap)
+            };
+        }
+        return b;
+    });
+}
 
 module.exports = {
     startUpgrade,
@@ -682,5 +725,7 @@ module.exports = {
     processCompletedConstruction,
     getQueue,
     getAvailableBuildings,
-    getReservedWorkers
+    getReservedWorkers,
+    getCityBuildings,
+    collectResource
 };

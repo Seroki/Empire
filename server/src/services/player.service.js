@@ -1,12 +1,12 @@
-const db = require("../database/db");
-const bcrypt = require("bcrypt");
+const pool = require("../database/db");
+const bcrypt = require("bcryptjs");
 
 
 async function createPlayer(username, password) {
 
     const passwordHash = await bcrypt.hash(password, 10);
 
-    const client = await db.connect();
+    const client = await pool.connect();
 
     try {
 
@@ -108,7 +108,7 @@ async function createPlayer(username, password) {
 
 
 async function getPlayerByCityId(cityId) {
-    const result = await db.query(
+    const result = await pool.query(
         `
         SELECT p.id, p.username, p.title, p.prestige, p.honor, p.alliance
         FROM players p
@@ -131,7 +131,7 @@ async function updatePlayerName(playerId, username) {
     }
 
     try {
-        const result = await db.query(
+        const result = await pool.query(
             `UPDATE players SET username = $1 WHERE id = $2 RETURNING id, username`,
             [trimmed, playerId]
         );
