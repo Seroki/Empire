@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wall Defenses & Fortifications</title>
+  <style>
+    :root {
+      --bg: #0d0b09;
+      --panel-bg: #1a1714;
+      --panel-raised: #24201c;
+      --ink: #0f0d0b;
+      --line: #3d3228;
+      --parchment: #e2d9c8;
+      --brass: #c8a050;
+      --brass-dim: #96783c;
+      --faded: #8c8275;
+      --rust: #8b3a2b;
+      --green: #5c8b3a;
+      --font-main: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-mono: "Courier New", Courier, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg);
+      color: var(--parchment);
+      font-family: var(--font-main);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 16px;
+    }
+
+    .window-panel {
+      width: 100%;
+      max-width: 720px;
+      background: var(--panel-bg);
+      border: 2px solid var(--line);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.8);
+    }
+
+    .window-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      background: var(--ink);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .window-header h1 {
+      font-size: 14px;
+      color: var(--brass);
+      text-transform: uppercase;
+      font-family: var(--font-mono);
+      letter-spacing: 1px;
+    }
+
+    .window-body { padding: 16px; }
+
+    .capacity-box {
+      background: var(--panel-raised);
+      border: 1px solid var(--line);
+      padding: 12px;
+      margin-bottom: 16px;
+    }
+
+    .progress-bar-bg {
+      height: 8px;
+      background: var(--ink);
+      border: 1px solid var(--line);
+      overflow: hidden;
+      margin: 6px 0;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--brass);
+      transition: width 0.3s ease;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+      text-align: left;
+    }
+
+    th {
+      padding: 8px 6px;
+      color: var(--faded);
+      font-family: var(--font-mono);
+      border-bottom: 1px solid var(--line);
+    }
+
+    td {
+      padding: 8px 6px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      vertical-align: top;
+    }
+
+    tr.locked {
+      opacity: 0.35;
+      background: rgba(0,0,0,0.2);
+    }
+
+    input[type="number"] {
+      width: 52px;
+      background: var(--ink);
+      color: var(--parchment);
+      border: 1px solid var(--line);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 2px 4px;
+    }
+
+    .btn {
+      padding: 3px 8px;
+      font-size: 10px;
+      border: 1px solid var(--line);
+      background: var(--panel-raised);
+      color: var(--parchment);
+      cursor: pointer;
+    }
+
+    .btn-build {
+      border-color: var(--brass);
+      color: var(--brass);
+    }
+
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      border-color: var(--line);
+      color: var(--faded);
+    }
+
+    .queue-section {
+      margin-top: 16px;
+      border-top: 1px solid var(--line);
+      padding-top: 12px;
+    }
+
+    .queue-title {
+      font-size: 11px;
+      color: var(--brass);
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="window-panel">
+    <div class="window-header">
+      <h1>🛡️ Wall Defenses & Fortifications</h1>
+      <span id="wall-level-tag" style="font-size: 11px; color: var(--faded); font-family: var(--font-mono);">Wall Lv --</span>
+    </div>
+
+    <div class="window-body" id="app">
+      <p style="text-align: center; color: var(--faded); font-size: 12px;">Loading fortification matrix...</p>
+    </div>
+  </div>
+
+<script>
+  const API_BASE = window.API_BASE || "";
+  const urlParams = new URLSearchParams(window.location.search);
+  const currentCityId = urlParams.get("cityId") || 1;
+
+  // Static display-only info NOT covered by the backend response (flavor
+  // text only — gating, costs, and stats all come from unit_types via the
+  // API now). Keyed by unit_types.code.
+  const displayInfo = {
+    trap: { purpose: "Anti-infantry / ground troops" },
+    abatis: { purpose: "Anti-mounted troops" },
+    archer_tower: { purpose: "Long-range defensive fire" },
+    rolling_log: { purpose: "Heavy one-shot attack" },
+    defensive_trebuchet: { purpose: "Anti-siege / heavy defensive weapon" }
+  };
+
+  async function loadWallInterface() {
+    const app = document.getElementById("app");
+
+    let data = null;
+    try {
+      const res = await fetch(`${API_BASE}/defenses/wall?cityId=${currentCityId}`);
+      if (res.ok) data = await res.json();
+    } catch (e) {
+      console.warn("Backend API unreachable.");
+    }
+
+    if (!data) {
+      app.innerHTML = `<div style="color:var(--rust); text-align:center;">Could not load wall data from the server.</div>`;
+      return;
+    }
+
+    // Everything below comes straight from getWallState() — wallLevel,
+    // maxSpace, and per-item unlocked/requirements are all resolved
+    // server-side now (reusing the same unit_research_requirements engine
+    // as Barracks troops), instead of the old hardcoded reqWall/reqMetal
+    // catalog that had no connection to the real prerequisite system.
+    const wallLevel = Number(data.wallLevel || 0);
+    const maxSpace = Number(data.maxSpace || 0);
+    const defenses = data.defenses || [];
+    const queueList = data.queue || [];
+
+    document.getElementById("wall-level-tag").textContent = `Wall Lv ${wallLevel}`;
+
+    let usedSpace = 0;
+    defenses.forEach(d => {
+      usedSpace += (Number(d.built || 0) * Number(d.population_cost || 0));
+    });
+
+    const freeSpace = Math.max(0, maxSpace - usedSpace);
+    const spacePercent = maxSpace > 0 ? Math.min(100, (usedSpace / maxSpace) * 100) : 0;
+
+    let html = `
+      <div class="capacity-box">
+        <div style="display:flex; justify-content: space-between; font-size: 11px;">
+          <span style="color: var(--faded);">Fortified Wall Space:</span>
+          <strong>${usedSpace.toLocaleString()} / ${maxSpace.toLocaleString()} Spaces</strong>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" style="width: ${spacePercent}%; background: ${spacePercent >= 100 ? 'var(--rust)' : 'var(--brass)'}"></div>
+        </div>
+        <div style="display:flex; justify-content: flex-end; font-size: 10px; color: var(--faded);">
+          <span>Available Space: <strong style="color:var(--green);">${freeSpace.toLocaleString()}</strong></span>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>DEFENSE</th>
+            <th>STATS & COST</th>
+            <th style="text-align:center;">BUILT</th>
+            <th>BUILD ORDER</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    const resources = data.resources || {};
+
+    defenses.forEach(d => {
+      const unlocked = !!d.unlocked;
+      const reqs = d.requirements || [];
+      // Hover tooltip listing every requirement, met and unmet — same
+      // pattern used for the Barracks troop tooltip fix, sourced from the
+      // real backend data instead of a hardcoded reqWall/reqMetal guess.
+      const tooltipText = reqs.length > 0
+        ? reqs.map(r => `${r.met ? '✓' : '✗'} ${r.name}`).join('\n').replace(/"/g, '&quot;')
+        : '';
+      const firstUnmet = reqs.find(r => !r.met);
+
+      const space = Number(d.population_cost || 0);
+      const purpose = displayInfo[d.code]?.purpose || '';
+
+      const spaceLimit = space > 0 ? Math.floor(freeSpace / space) : 0;
+      let limits = [spaceLimit];
+      if (resources.food  !== undefined && d.food_cost  > 0) limits.push(Math.floor(resources.food  / d.food_cost));
+      if (resources.wood  !== undefined && d.wood_cost  > 0) limits.push(Math.floor(resources.wood  / d.wood_cost));
+      if (resources.stone !== undefined && d.stone_cost > 0) limits.push(Math.floor(resources.stone / d.stone_cost));
+      if (resources.iron  !== undefined && d.iron_cost  > 0) limits.push(Math.floor(resources.iron  / d.iron_cost));
+
+      const maxBuildable = unlocked ? Math.max(0, Math.min(...limits)) : 0;
+      const count = Number(d.built || 0);
+
+      html += `
+        <tr class="${!unlocked ? 'locked' : ''}">
+          <td ${tooltipText ? `title="${tooltipText}"` : ''} style="${!unlocked ? 'cursor: help;' : ''}">
+            <strong style="color:${unlocked ? 'var(--parchment)' : 'var(--faded)'};">${d.name}</strong>
+            <div style="font-size:9px; color:var(--faded); margin-top:2px;">
+              ${unlocked
+                ? `📐 Space: ${space} | 🎯 ${purpose}`
+                : `<span style="color:var(--rust); font-weight:bold; border-bottom: 1px dotted var(--rust);">🔒 ${firstUnmet ? `Req: ${firstUnmet.name}` : 'Locked'}</span>`}
+            </div>
+          </td>
+          <td style="font-size:10px;">
+            ⚔️ ATK: ${d.attack ?? '—'} | 🛡️ DEF: ${d.defense ?? '—'} | 📏 Range: ${d.range_yards || 'Melee'}<br>
+            <span style="color:var(--faded);">🌾${d.food_cost ?? 0} | 🪵${d.wood_cost ?? 0} | 🪨${d.stone_cost ?? 0} | ⛏️${d.iron_cost ?? 0}</span>
+          </td>
+          <td style="text-align:center; font-weight:bold; color:var(--brass);">
+            ${count.toLocaleString()}
+          </td>
+          <td>
+            ${unlocked ? `
+              <div style="display:flex; gap:4px; align-items:center;">
+                <input type="number" id="qty-${d.code}" value="${maxBuildable > 0 ? 1 : 0}" min="1" max="${maxBuildable}" ${maxBuildable === 0 ? 'disabled' : ''}>
+                <button class="btn" onclick="document.getElementById('qty-${d.code}').value=${maxBuildable}" ${maxBuildable === 0 ? 'disabled' : ''}>Max</button>
+                <button class="btn btn-build" onclick="submitBuild('${d.code}')" ${maxBuildable === 0 ? 'disabled' : ''}>Build</button>
+              </div>
+              <div style="font-size:8px; color:var(--faded); margin-top:2px;">Max: ${maxBuildable.toLocaleString()}</div>
+            ` : `
+              <span style="color:var(--rust); font-style:italic; cursor: help;" title="${tooltipText}">🔒 Locked</span>
+            `}
+          </td>
+        </tr>
+      `;
+    });
+
+    html += `</tbody></table>`;
+
+    if (queueList.length > 0) {
+      html += `
+        <div class="queue-section">
+          <div class="queue-title">Construction Queue</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Fortification</th>
+                <th>Quantity</th>
+                <th>Completes At</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${queueList.map(q => `
+                <tr>
+                  <td>${q.name}</td>
+                  <td><strong>${q.quantity}</strong></td>
+                  <td style="color:var(--brass);">${new Date(q.finish_at).toLocaleTimeString()}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    app.innerHTML = html;
+  }
+
+  async function submitBuild(code) {
+    const qtyInput = document.getElementById(`qty-${code}`);
+    const quantity = Math.max(1, Number(qtyInput?.value) || 1);
+
+    try {
+      const res = await fetch(`${API_BASE}/defenses/build`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cityId: currentCityId,
+          defenseCode: code,
+          quantity: quantity
+        })
+      });
+
+      const result = await res.json();
+      if (res.ok && result.success) {
+        loadWallInterface();
+      } else {
+        alert(result.error || "Build order rejected.");
+      }
+    } catch (e) {
+      alert("Could not connect to server.");
+    }
+  }
+
+  loadWallInterface();
+</script>
+</body>
+</html>

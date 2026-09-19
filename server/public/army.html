@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Army Overview & Military Strength</title>
+  <style>
+    :root {
+      --bg: #0d0b09;
+      --panel-bg: #1a1714;
+      --panel-raised: #24201c;
+      --ink: #0f0d0b;
+      --line: #3d3228;
+      --parchment: #e2d9c8;
+      --brass: #c8a050;
+      --brass-dim: #96783c;
+      --faded: #8c8275;
+      --rust: #8b3a2b;
+      --green: #5c8b3a;
+      --blue: #4a7a96;
+      --font-main: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-mono: "Courier New", Courier, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg);
+      color: var(--parchment);
+      font-family: var(--font-main);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 16px;
+    }
+
+    .window-panel {
+      width: 100%;
+      max-width: 720px;
+      background: var(--panel-bg);
+      border: 2px solid var(--line);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.8);
+    }
+
+    .window-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      background: var(--ink);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .window-header h1 {
+      font-size: 14px;
+      color: var(--brass);
+      text-transform: uppercase;
+      font-family: var(--font-mono);
+      letter-spacing: 1px;
+    }
+
+    .window-body { padding: 16px; }
+
+    .summary-box {
+      background: var(--panel-raised);
+      border: 1px solid var(--line);
+      padding: 12px;
+      margin-bottom: 16px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      text-align: center;
+    }
+
+    .summary-card {
+      padding: 8px;
+      background: var(--ink);
+      border: 1px solid var(--line);
+    }
+
+    .summary-label {
+      font-size: 10px;
+      color: var(--faded);
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .summary-value {
+      font-size: 14px;
+      font-weight: bold;
+      font-family: var(--font-mono);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+      text-align: left;
+    }
+
+    th {
+      padding: 8px 6px;
+      color: var(--faded);
+      font-family: var(--font-mono);
+      border-bottom: 1px solid var(--line);
+    }
+
+    td {
+      padding: 8px 6px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      vertical-align: middle;
+    }
+
+    tr.total-row {
+      background: var(--panel-raised);
+      font-weight: bold;
+    }
+
+    tr.total-row td {
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      color: var(--brass);
+    }
+
+    .badge-city { color: var(--green); font-family: var(--font-mono); }
+    .badge-field { color: var(--blue); font-family: var(--font-mono); }
+    .badge-total { color: var(--brass); font-family: var(--font-mono); font-weight: bold; }
+  </style>
+</head>
+<body>
+
+  <div class="window-panel">
+    <div class="window-header">
+      <h1>⚔️ Military Overview & Standing Forces</h1>
+      <span id="city-tag" style="font-size: 11px; color: var(--faded); font-family: var(--font-mono);">City ID --</span>
+    </div>
+
+    <div class="window-body" id="app">
+      <p style="text-align: center; color: var(--faded); font-size: 12px;">Gathering military reports...</p>
+    </div>
+  </div>
+
+<script>
+  const API_BASE = window.API_BASE || "";
+  const urlParams = new URLSearchParams(window.location.search);
+  const currentCityId = urlParams.get("cityId") || 1;
+
+  async function loadArmyInterface() {
+    const app = document.getElementById("app");
+    document.getElementById("city-tag").textContent = `City ID: ${currentCityId}`;
+
+    try {
+      let data = { army: [] };
+      try {
+        const res = await fetch(`${API_BASE}/units/overview?cityId=${currentCityId}`);
+        if (res.ok) data = await res.json();
+      } catch (e) {
+        console.warn("Backend API unreachable, displaying base structure.");
+      }
+
+      const army = data.army || [];
+
+      let totalInCity = 0;
+      let totalInField = 0;
+      let grandTotal = 0;
+
+      army.forEach(u => {
+        totalInCity += Number(u.inCity || 0);
+        totalInField += Number(u.inField || 0);
+        grandTotal += Number(u.total || 0);
+      });
+
+      let html = `
+        <div class="summary-box">
+          <div class="summary-card">
+            <div class="summary-label">Garrisoned</div>
+            <div class="summary-value badge-city">${totalInCity.toLocaleString()}</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Deployed</div>
+            <div class="summary-value badge-field">${totalInField.toLocaleString()}</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Total Forces</div>
+            <div class="summary-value badge-total">${grandTotal.toLocaleString()}</div>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>UNIT TYPE</th>
+              <th style="text-align:right;">IN CITY</th>
+              <th style="text-align:right;">IN FIELD</th>
+              <th style="text-align:right;">TOTAL</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      if (army.length === 0) {
+        html += `
+          <tr>
+            <td colspan="4" style="text-align:center; color:var(--faded); padding:16px;">
+              No troops found in garrison or field deployments.
+            </td>
+          </tr>
+        `;
+      } else {
+        army.forEach(unit => {
+          html += `
+            <tr>
+              <td><strong style="color: var(--parchment);">${unit.name}</strong></td>
+              <td style="text-align:right;" class="badge-city">${Number(unit.inCity || 0).toLocaleString()}</td>
+              <td style="text-align:right;" class="badge-field">${Number(unit.inField || 0).toLocaleString()}</td>
+              <td style="text-align:right;" class="badge-total">${Number(unit.total || 0).toLocaleString()}</td>
+            </tr>
+          `;
+        });
+
+        html += `
+          <tr class="total-row">
+            <td>GRAND TOTAL</td>
+            <td style="text-align:right;" class="badge-city">${totalInCity.toLocaleString()}</td>
+            <td style="text-align:right;" class="badge-field">${totalInField.toLocaleString()}</td>
+            <td style="text-align:right;" class="badge-total">${grandTotal.toLocaleString()}</td>
+          </tr>
+        `;
+      }
+
+      html += `</tbody></table>`;
+      app.innerHTML = html;
+
+    } catch (err) {
+      app.innerHTML = `<div style="color:var(--rust); text-align:center;">Failed to render army matrix.</div>`;
+    }
+  }
+
+  loadArmyInterface();
+  setInterval(loadArmyInterface, 5000);
+</script>
+</body>
+</html>

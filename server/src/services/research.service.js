@@ -1,168 +1,451 @@
-const db = require("../database/db");
+// ============================================================================
+// FILE: src/services/research.service.js
+// RESEARCH SERVICE — matches the real database:
+// research_nodes (discipline, branch_code, branch_name, level, step,
+// effect_type, requires_academy_level, linked_building_id, gold_cost,
+// food_cost, research_seconds, is_gateway — cost/time are per-node, not
+// formula-derived; quarry_bonus_pct/requires_quarry_level exist but are not
+// wired in yet),
+// research_node_prerequisites (generalized as of the requirements migration:
+// requirement_type = RESEARCH | ACADEMY | BUILDING. RESEARCH rows use
+// prerequisite_node_id; ACADEMY rows use required_academy_level; BUILDING
+// rows use required_building_type_id + required_building_level. Replaces
+// both the old research-only prereq table AND research_nodes.
+// requires_academy_level, which is now a legacy column left in place for
+// transition but no longer read by this service),
+// system_effects (branch_system -> step_bonus_pct, used for the per-branch
+// production bonus), and research_queue (the active-research table).
+// ============================================================================
 
-// Academy building_type_id = 6
-const ACADEMY_BUILDING_TYPE_ID = 6;
+const pool = require("../database/db");
 
-const TECH_DEFINITIONS = {
-  AGRICULTURE: { id: 1, baseTime: 900, baseCost: { food: 500, wood: 1000, stone: 500, iron: 200, gold: 0 }, reqAcademy: 1, reqTechs: {} },
-  LUMBERING: { id: 2, baseTime: 900, baseCost: { food: 500, wood: 500, stone: 1000, iron: 500, gold: 0 }, reqAcademy: 1, reqTechs: {} },
-  MASONRY: { id: 3, baseTime: 1200, baseCost: { food: 500, wood: 1000, stone: 500, iron: 1000, gold: 0 }, reqAcademy: 1, reqTechs: {} },
-  MINING: { id: 4, baseTime: 1500, baseCost: { food: 1000, wood: 1000, stone: 1000, iron: 500, gold: 0 }, reqAcademy: 1, reqTechs: {} },
-  STOCKPILE: { id: 5, baseTime: 2400, baseCost: { food: 1000, wood: 2000, stone: 4000, iron: 1000, gold: 0 }, reqAcademy: 1, reqTechs: { AGRICULTURE: 1 } },
-  MEDICINE: { id: 6, baseTime: 2700, baseCost: { food: 3000, wood: 1000, stone: 1000, iron: 1000, gold: 0 }, reqAcademy: 3, reqTechs: { AGRICULTURE: 1 } },
-  LOGISTICS: { id: 7, baseTime: 3600, baseCost: { food: 2000, wood: 5000, stone: 2000, iron: 2000, gold: 0 }, reqAcademy: 3, reqTechs: {} },
-  CONSTRUCTION: { id: 8, baseTime: 1800, baseCost: { food: 1000, wood: 3000, stone: 5000, iron: 1000, gold: 0 }, reqAcademy: 2, reqTechs: {} },
-  MILITARY_SCIENCE: { id: 9, baseTime: 1800, baseCost: { food: 1000, wood: 2000, stone: 1000, iron: 1000, gold: 0 }, reqAcademy: 2, reqTechs: {} },
-  MILITARY_TRADITION: { id: 10, baseTime: 2700, baseCost: { food: 2000, wood: 3000, stone: 1000, iron: 2000, gold: 0 }, reqAcademy: 3, reqTechs: { MILITARY_SCIENCE: 1 } },
-  INFORMATICS: { id: 11, baseTime: 1200, baseCost: { food: 1000, wood: 2000, stone: 1000, iron: 1000, gold: 0 }, reqAcademy: 1, reqTechs: {} },
-  ARCHERY: { id: 12, baseTime: 5400, baseCost: { food: 3000, wood: 10000, stone: 2000, iron: 3000, gold: 0 }, reqAcademy: 4, reqTechs: { MILITARY_SCIENCE: 2 } },
-  HORSEBACK_RIDING: { id: 13, baseTime: 3600, baseCost: { food: 5000, wood: 3000, stone: 2000, iron: 3000, gold: 0 }, reqAcademy: 3, reqTechs: { MILITARY_SCIENCE: 1 } },
-  COMPASS: { id: 14, baseTime: 2700, baseCost: { food: 2000, wood: 3000, stone: 1000, iron: 1000, gold: 0 }, reqAcademy: 3, reqTechs: { HORSEBACK_RIDING: 1 } },
-  ENGINEERING: { id: 15, baseTime: 7200, baseCost: { food: 3000, wood: 8000, stone: 5000, iron: 5000, gold: 0 }, reqAcademy: 5, reqTechs: { METAL_CASTING: 2 } },
-  METAL_CASTING: { id: 16, baseTime: 5400, baseCost: { food: 2000, wood: 5000, stone: 3000, iron: 8000, gold: 0 }, reqAcademy: 5, reqTechs: { MINING: 1 } },
-  IRON_WORKING: { id: 17, baseTime: 3600, baseCost: { food: 2000, wood: 2000, stone: 2000, iron: 4000, gold: 0 }, reqAcademy: 4, reqTechs: { METAL_CASTING: 1 } }
-};
+// ----------------------------------------------------------------------------
+// Cost / duration — research_nodes now has real columns for these
+// (gold_cost, food_cost, research_seconds, is_gateway), set per node in the
+// DB. Read them directly rather than deriving them from a level formula.
+// research_nodes has no wood_cost/stone_cost/iron_cost columns, so research
+// only ever consumes gold + food.
+// ----------------------------------------------------------------------------
 
-function calculateTechCost(baseCost, targetLevel) {
-  return Math.ceil(baseCost * Math.pow(1.45, targetLevel - 1));
+function isGatewayStep(node) {
+  return !!node.is_gateway;
 }
 
-function calculateResearchDuration(baseTime, mayorIntelligence, academyLevel) {
-  const intelDenominator = 1 + (mayorIntelligence / 100);
-  const academyMultiplier = Math.pow(0.95, academyLevel - 1);
-  return Math.max(1, Math.floor((baseTime / intelDenominator) * academyMultiplier));
+function calculateNodeCost(node) {
+  return {
+    gold: Number(node.gold_cost || 0),
+    food: Number(node.food_cost || 0)
+  };
 }
 
-function getEffectiveTechLevel(globalTechLevel, localAcademyLevel) {
-  if (!globalTechLevel || globalTechLevel <= 0) return 0;
-  return Math.min(globalTechLevel, localAcademyLevel);
+// ActualTime = BaseTime / (1 + MayorINT/100) x 0.95^(AcademyLevel-1)
+// BaseTime comes straight from research_nodes.research_seconds.
+function calculateResearchTime(baseTimeSeconds, academyLevel, mayorInt) {
+  const intFactor = 1 + (Number(mayorInt || 0) / 100);
+  const academyFactor = Math.pow(0.95, Math.max(0, Number(academyLevel || 1) - 1));
+  return Math.round((baseTimeSeconds / intFactor) * academyFactor);
 }
 
-async function getCityMayorIntelligence(cityId) {
-  const mayorRes = await db.query(
-    `SELECT intelligence FROM heroes WHERE city_id = $1 AND status = 'MAYOR' LIMIT 1`,
+// ----------------------------------------------------------------------------
+// Shared lookups
+// ----------------------------------------------------------------------------
+
+async function getCityAcademyLevel(client, cityId) {
+  const res = await client.query(`
+    SELECT cb.level FROM city_buildings cb
+    JOIN building_types bt ON cb.building_type_id = bt.id
+    WHERE cb.city_id = $1 AND UPPER(bt.name) = 'ACADEMY'
+  `, [cityId]);
+  return res.rows[0]?.level || 0;
+}
+
+async function getCityMayorIntelligence(client, cityId) {
+  const res = await client.query(
+    `SELECT intelligence FROM heroes WHERE city_id = $1 AND is_mayor = true LIMIT 1`,
     [cityId]
   );
-  return mayorRes.rows[0]?.intelligence || 0;
+  return res.rows[0]?.intelligence ?? 0;
+}
+
+// Map of building_type_id -> level for every building this city has, used
+// to resolve BUILDING-type requirements (Workshop, Barracks, Sawmill, etc.)
+// generically instead of one-off queries per building.
+async function getCityBuildingLevelsMap(client, cityId) {
+  const res = await client.query(
+    `SELECT building_type_id, level FROM city_buildings WHERE city_id = $1`,
+    [cityId]
+  );
+  const map = {};
+  for (const row of res.rows) map[row.building_type_id] = row.level;
+  return map;
+}
+
+async function getBuildingTypeNameMap(client) {
+  const res = await client.query(`SELECT id, name FROM building_types`);
+  const map = {};
+  for (const row of res.rows) map[row.id] = row.name;
+  return map;
+}
+
+async function getPlayerCompletedNodeSet(client, playerId) {
+  const res = await client.query(
+    `SELECT research_node_id FROM player_completed_research_nodes WHERE player_id = $1`,
+    [playerId]
+  );
+  return new Set(res.rows.map(r => r.research_node_id));
+}
+
+/**
+ * A node is unlocked once every requirement row for it is satisfied.
+ * research_node_prerequisites now holds three requirement shapes:
+ *   - RESEARCH: prerequisite_node_id must be in the player's completed set
+ *     (this is also how Craftsmanship's hidden level-gate works — it's just
+ *     a RESEARCH-type row pointing at the relevant Craftsmanship node)
+ *   - ACADEMY: academyLevel must meet required_academy_level
+ *   - BUILDING: cityBuildingLevels[required_building_type_id] must meet
+ *     required_building_level (e.g. Workshop combo requirements)
+ */
+function isNodeUnlocked(node, requirementsByNodeId, completedSet, academyLevel, cityBuildingLevels) {
+  const reqs = requirementsByNodeId[node.id] || [];
+  return reqs.every(r => {
+    if (r.requirement_type === 'ACADEMY') {
+      return academyLevel >= Number(r.required_academy_level || 0);
+    }
+    if (r.requirement_type === 'BUILDING') {
+      const currentLevel = cityBuildingLevels[r.required_building_type_id] || 0;
+      return currentLevel >= Number(r.required_building_level || 0);
+    }
+    // RESEARCH (default/fallback)
+    return completedSet.has(r.prerequisite_node_id);
+  });
+}
+
+async function getAllRequirementsByNodeId(client) {
+  const res = await client.query(`SELECT * FROM research_node_prerequisites`);
+  const map = {};
+  for (const row of res.rows) {
+    if (!map[row.research_node_id]) map[row.research_node_id] = [];
+    map[row.research_node_id].push(row);
+  }
+  return map;
+}
+
+async function getEffectsByBranchCode(client) {
+  const res = await client.query(`SELECT * FROM system_effects`);
+  const map = {};
+  for (const row of res.rows) map[row.branch_system] = row;
+  return map;
+}
+
+// ----------------------------------------------------------------------------
+// Public: full tree for the Research modal
+// ----------------------------------------------------------------------------
+
+async function getResearchTree(playerId, cityId) {
+  const client = await pool.connect();
+  try {
+    const academyLevel = await getCityAcademyLevel(client, cityId);
+    const completedSet = await getPlayerCompletedNodeSet(client, playerId);
+    const requirementsByNodeId = await getAllRequirementsByNodeId(client);
+    const effectsByBranch = await getEffectsByBranchCode(client);
+    const cityBuildingLevels = await getCityBuildingLevelsMap(client, cityId);
+    const buildingTypeNameMap = await getBuildingTypeNameMap(client);
+
+    const nodeNamesRes = await client.query(`SELECT id, name FROM research_nodes`);
+    const nodeNameMap = {};
+    for (const row of nodeNamesRes.rows) {
+      nodeNameMap[row.id] = row.name;
+    }
+
+    const activeQueueRes = await client.query(
+      `SELECT * FROM research_queue WHERE player_id = $1 AND status = 'IN_PROGRESS' LIMIT 1`,
+      [playerId]
+    );
+    const activeQueueRow = activeQueueRes.rows[0] || null;
+    // Aliases for the existing frontend, which expects tech_code and
+    // finish_time (from an older schema) rather than research_node_id and
+    // finish_at. Keeping the real column names as the source of truth and
+    // aliasing here avoids touching the large, fragile index.html file.
+    const activeQueue = activeQueueRow ? {
+      ...activeQueueRow,
+      tech_code: activeQueueRow.research_node_id,
+      finish_time: activeQueueRow.finish_at
+    } : null;
+
+    const nodesRes = await client.query(
+      `SELECT * FROM research_nodes ORDER BY discipline, branch_code, level, step`
+    );
+
+    const tree = {};
+
+    for (const node of nodesRes.rows) {
+      const gateway = isGatewayStep(node);
+      const completed = completedSet.has(node.id);
+      const unlocked = completed || isNodeUnlocked(node, requirementsByNodeId, completedSet, academyLevel, cityBuildingLevels);
+      const effect = effectsByBranch[node.branch_code];
+      // Gateway nodes carry their own specific bonus_pct (e.g. Construction's
+      // 20/25/30...65%). Regular filler nodes fall back to the flat
+      // system_effects step bonus (currently +2% across the branches that
+      // have it). node.bonus_pct is NULL for nodes where no explicit value
+      // was ever given (most completed branches besides Happiness/Construction).
+      const bonusPct = node.bonus_pct !== null && node.bonus_pct !== undefined
+        ? Number(node.bonus_pct)
+        : (node.effect_type === 'BONUS' ? Number(effect?.step_bonus_pct ?? 0) : null);
+
+      const discKey = node.discipline.toLowerCase();
+      if (!tree[discKey]) tree[discKey] = {};
+
+      if (!tree[discKey][node.branch_code]) {
+        tree[discKey][node.branch_code] = {
+          branchName: node.branch_name,
+          linkedBuildingId: node.linked_building_id,
+          nodes: []
+        };
+      }
+
+      const rawReqs = requirementsByNodeId[node.id] || [];
+      const formattedPrerequisites = rawReqs.map(r => {
+        if (r.requirement_type === 'ACADEMY') {
+          const requiredLevel = Number(r.required_academy_level || 0);
+          return {
+            type: 'BUILDING',
+            id: 'ACADEMY',
+            name: `Academy Level ${requiredLevel}`,
+            requiredLevel,
+            currentLevel: academyLevel,
+            met: academyLevel >= requiredLevel
+          };
+        }
+        if (r.requirement_type === 'BUILDING') {
+          const requiredLevel = Number(r.required_building_level || 0);
+          const currentLevel = cityBuildingLevels[r.required_building_type_id] || 0;
+          const buildingName = buildingTypeNameMap[r.required_building_type_id] || `Building #${r.required_building_type_id}`;
+          return {
+            type: 'BUILDING',
+            id: buildingName.toUpperCase(),
+            name: `${buildingName} Level ${requiredLevel}`,
+            requiredLevel,
+            currentLevel,
+            met: currentLevel >= requiredLevel
+          };
+        }
+        // RESEARCH (default/fallback)
+        return {
+          type: 'RESEARCH',
+          id: r.prerequisite_node_id,
+          name: nodeNameMap[r.prerequisite_node_id] || r.prerequisite_node_id,
+          met: completedSet.has(r.prerequisite_node_id)
+        };
+      });
+
+      const academyReq = rawReqs.find(r => r.requirement_type === 'ACADEMY');
+      const requiredAcademyLevel = academyReq ? Number(academyReq.required_academy_level || 0) : 0;
+
+      tree[discKey][node.branch_code].nodes.push({
+        researchId: node.id,
+        level: node.level,
+        step: node.step,
+        name: node.name,
+        description: node.description,
+        benefitText: node.description, // alias — frontend card display expects this name
+        effectType: node.effect_type,
+        isGateway: gateway,
+        bonusPct,
+        requiresAcademyLevel: requiredAcademyLevel,
+        cost: calculateNodeCost(node),
+        completed,
+        unlocked,
+        isCurrentlyResearching: activeQueue?.research_node_id === node.id,
+        prerequisites: formattedPrerequisites
+      });
+    }
+
+    return { academyLevel, activeQueue, tree };
+  } finally {
+    client.release();
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Public: start research on a single node
+// ----------------------------------------------------------------------------
+
+async function startResearchNode(playerId, cityId, researchId) {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const nodeRes = await client.query(
+      `SELECT * FROM research_nodes WHERE id = $1`,
+      [researchId]
+    );
+    if (nodeRes.rows.length === 0) {
+      throw new Error(`Unknown research node: ${researchId}`);
+    }
+    const node = nodeRes.rows[0];
+
+    // 1. No concurrent research.
+    const activeRes = await client.query(
+      `SELECT * FROM research_queue WHERE player_id = $1 AND status = 'IN_PROGRESS' LIMIT 1`,
+      [playerId]
+    );
+    if (activeRes.rows.length > 0) {
+      throw new Error(`Already researching node #${activeRes.rows[0].research_node_id}. Wait until it finishes.`);
+    }
+
+    // 2. Not already completed.
+    const completedRes = await client.query(
+      `SELECT 1 FROM player_completed_research_nodes WHERE player_id = $1 AND research_node_id = $2`,
+      [playerId, researchId]
+    );
+    if (completedRes.rows.length > 0) {
+      throw new Error(`${node.name} is already researched.`);
+    }
+
+    // 3. Academy level (city-wide, needed below for cost/time too).
+    const academyLevel = await getCityAcademyLevel(client, cityId);
+
+    // 4. Requirements — every row for this node must be satisfied:
+    //    RESEARCH (must be completed), ACADEMY (level met), or BUILDING
+    //    (city's building of that type meets the level, e.g. Workshop combo
+    //    requirements, or Craftsmanship's hidden-level RESEARCH-type gate).
+    const reqRes = await client.query(
+      `SELECT * FROM research_node_prerequisites WHERE research_node_id = $1`,
+      [researchId]
+    );
+    const completedSet = await getPlayerCompletedNodeSet(client, playerId);
+    const cityBuildingLevels = await getCityBuildingLevelsMap(client, cityId);
+
+    for (const r of reqRes.rows) {
+      if (r.requirement_type === 'ACADEMY') {
+        const requiredLevel = Number(r.required_academy_level || 0);
+        if (academyLevel < requiredLevel) {
+          throw new Error(`Requires Academy Level ${requiredLevel}.`);
+        }
+      } else if (r.requirement_type === 'BUILDING') {
+        const requiredLevel = Number(r.required_building_level || 0);
+        const currentLevel = cityBuildingLevels[r.required_building_type_id] || 0;
+        if (currentLevel < requiredLevel) {
+          const buildingTypeNameMap = await getBuildingTypeNameMap(client);
+          const buildingName = buildingTypeNameMap[r.required_building_type_id] || `Building #${r.required_building_type_id}`;
+          throw new Error(`Requires ${buildingName} Level ${requiredLevel}.`);
+        }
+      } else {
+        // RESEARCH (default/fallback)
+        if (!completedSet.has(r.prerequisite_node_id)) {
+          const prereqNodeRes = await client.query(
+            `SELECT name FROM research_nodes WHERE id = $1`,
+            [r.prerequisite_node_id]
+          );
+          const prereqName = prereqNodeRes.rows[0]?.name || `node #${r.prerequisite_node_id}`;
+          throw new Error(`Requires ${prereqName} to be researched first.`);
+        }
+      }
+    }
+
+    // 5. Cost — straight from the node's own gold_cost/food_cost columns.
+    const cost = calculateNodeCost(node);
+    const resResult = await client.query(`SELECT * FROM city_resources WHERE city_id = $1 FOR UPDATE`, [cityId]);
+    if (resResult.rows.length === 0) throw new Error("City resources not found.");
+    const resources = resResult.rows[0];
+
+    if (resources.food < cost.food || resources.gold < cost.gold) {
+      throw new Error("Insufficient resources for this research.");
+    }
+
+    await client.query(`
+      UPDATE city_resources
+      SET food = food - $1, gold = gold - $2, updated_at = NOW()
+      WHERE city_id = $3
+    `, [cost.food, cost.gold, cityId]);
+
+    // 6. Duration — node's own research_seconds, reduced by mayor's
+    // intelligence and further discounted by academy level.
+    const mayorInt = await getCityMayorIntelligence(client, cityId);
+    const baseTime = Number(node.research_seconds || 0);
+    const durationSeconds = calculateResearchTime(baseTime, academyLevel, mayorInt);
+
+    const startedAt = new Date();
+    const finishAt = new Date(startedAt.getTime() + durationSeconds * 1000);
+
+    const insertRes = await client.query(`
+      INSERT INTO research_queue (player_id, city_id, research_node_id, started_at, finish_at, status)
+      VALUES ($1, $2, $3, $4, $5, 'IN_PROGRESS')
+      RETURNING *
+    `, [playerId, cityId, researchId, startedAt, finishAt]);
+
+    await client.query("COMMIT");
+    return insertRes.rows[0];
+
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 async function resolveCompletedResearch(playerId) {
-  // Find any IN_PROGRESS research that has expired
-  const expiredRes = await db.query(
-    `SELECT * FROM research_queue 
-     WHERE player_id = $1 AND status = 'IN_PROGRESS' AND finish_time <= NOW()`,
+  const completedRes = await pool.query(
+    `SELECT * FROM research_queue WHERE player_id = $1 AND status = 'IN_PROGRESS' AND finish_at <= NOW()`,
     [playerId]
   );
 
-  for (const task of expiredRes.rows) {
-    await db.query('BEGIN');
+  for (const item of completedRes.rows) {
+    await pool.query(`
+      INSERT INTO player_completed_research_nodes (player_id, research_node_id)
+      VALUES ($1, $2)
+      ON CONFLICT (player_id, research_node_id) DO NOTHING
+    `, [playerId, item.research_node_id]);
 
-    // 1. Grant global player research level
-    await db.query(
-      `INSERT INTO player_researches (player_id, tech_code, level, updated_at)
-       VALUES ($1, $2, $3, NOW())
-       ON CONFLICT (player_id, tech_code) 
-       DO UPDATE SET level = EXCLUDED.level, updated_at = NOW()`,
-      [task.player_id, task.tech_code, task.target_level]
-    );
-
-    // 2. Mark queue item as completed
-    await db.query(
+    await pool.query(
       `UPDATE research_queue SET status = 'COMPLETED' WHERE id = $1`,
-      [task.id]
+      [item.id]
     );
 
-    await db.query('COMMIT');
-  }
-}
-
-async function startResearch(playerId, cityId, techCode, targetLevel) {
-  // CRITICAL ADDITION: Clear out any completed research first
-  await resolveCompletedResearch(playerId);
-
-  const config = TECH_DEFINITIONS[techCode];
-  if (!config) throw new Error(`Invalid tech code: ${techCode}`);
-
-  // Now this check will properly pass if the previous research finished!
-  const activeQueue = await db.query(
-    `SELECT id FROM research_queue WHERE player_id = $1 AND status = 'IN_PROGRESS'`,
-    [playerId]
-  );
-  if (activeQueue.rows.length > 0) {
-    throw new Error('Another research project is currently in progress. Global queue limit reached.');
-  }
-
-  const academyRes = await db.query(
-    `SELECT level FROM city_buildings WHERE city_id = $1 AND building_type_id = $2`,
-    [cityId, ACADEMY_BUILDING_TYPE_ID]
-  );
-  const academyLevel = academyRes.rows[0]?.level || 0;
-  if (academyLevel < config.reqAcademy) {
-    throw new Error(`Academy Level ${config.reqAcademy} required.`);
-  }
-
-  const playerTechRes = await db.query(
-    `SELECT level FROM player_researches WHERE player_id = $1 AND tech_code = $2`,
-    [playerId, techCode]
-  );
-  const currentLevel = playerTechRes.rows[0]?.level || 0;
-  if (targetLevel !== currentLevel + 1) {
-    throw new Error(`Target level ${targetLevel} invalid. Current level is ${currentLevel}.`);
-  }
-
-  for (const [reqTech, reqLevel] of Object.entries(config.reqTechs)) {
-    const reqRes = await db.query(
-      `SELECT level FROM player_researches WHERE player_id = $1 AND tech_code = $2`,
-      [playerId, reqTech]
+    // Collect this node's bonus into the player's running totals, if it
+    // has one. Archery's gateways currently have no bonus_value (never
+    // given an explicit cumulative % in the source design), so those are
+    // skipped rather than adding NULL/0.
+    const nodeRes = await pool.query(
+      `SELECT bonus_type, bonus_value FROM research_nodes WHERE id = $1`,
+      [item.research_node_id]
     );
-    if ((reqRes.rows[0]?.level || 0) < reqLevel) {
-      throw new Error(`Prerequisite ${reqTech} level ${reqLevel} not met.`);
+    const node = nodeRes.rows[0];
+    if (node && node.bonus_type && node.bonus_value != null) {
+      await pool.query(`
+        INSERT INTO player_bonus_totals (player_id, bonus_type, total_value)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (player_id, bonus_type)
+        DO UPDATE SET total_value = player_bonus_totals.total_value + EXCLUDED.total_value
+      `, [playerId, node.bonus_type, node.bonus_value]);
     }
   }
 
-  const mayorINT = await getCityMayorIntelligence(cityId);
+  return completedRes.rows;
+}
 
-  const foodCost = calculateTechCost(config.baseCost.food, targetLevel);
-  const woodCost = calculateTechCost(config.baseCost.wood, targetLevel);
-  const stoneCost = calculateTechCost(config.baseCost.stone, targetLevel);
-  const ironCost = calculateTechCost(config.baseCost.iron, targetLevel);
-  const goldCost = calculateTechCost(config.baseCost.gold, targetLevel);
-
-  const resCheck = await db.query(
-    `SELECT food, wood, stone, iron, gold FROM city_resources WHERE city_id = $1`,
-    [cityId]
+// Returns a map of bonus_type -> total_value for a player, e.g.
+// { CONSTRUCTION_SPEED: 27.00, FARM_EFFECTIVENESS: 6.00 }. Other services
+// (building speed/cost, resource production, combat, etc.) call this to
+// look up the player's current stacked bonus for a given stat.
+async function getPlayerBonusTotals(playerId) {
+  const res = await pool.query(
+    `SELECT bonus_type, total_value FROM player_bonus_totals WHERE player_id = $1`,
+    [playerId]
   );
-  const res = resCheck.rows[0];
-  if (!res || res.food < foodCost || res.wood < woodCost || res.stone < stoneCost || res.iron < ironCost || res.gold < goldCost) {
-    throw new Error('Insufficient resources in city.');
+  const totals = {};
+  for (const row of res.rows) {
+    totals[row.bonus_type] = Number(row.total_value);
   }
-
-  await db.query(
-    `UPDATE city_resources 
-     SET food = food - $1, wood = wood - $2, stone = stone - $3, iron = iron - $4, gold = gold - $5 
-     WHERE city_id = $6`,
-    [foodCost, woodCost, stoneCost, ironCost, goldCost, cityId]
-  );
-
-  const scaledBaseTime = calculateTechCost(config.baseTime, targetLevel);
-  const duration = calculateResearchDuration(scaledBaseTime, mayorINT, academyLevel);
-
-  const insertRes = await db.query(
-    `INSERT INTO research_queue (player_id, city_id, tech_code, target_level, start_time, finish_time, status)
-     VALUES ($1, $2, $3, $4, NOW(), NOW() + (INTERVAL '1 second' * $5), 'IN_PROGRESS')
-     RETURNING *`,
-    [playerId, cityId, techCode, targetLevel, duration]
-  );
-
-  return insertRes.rows[0];
+  return totals;
 }
 
 module.exports = {
-  TECH_DEFINITIONS,
-  calculateTechCost,
-  calculateResearchDuration,
-  getEffectiveTechLevel,
-  getCityMayorIntelligence,
+  calculateNodeCost,
+  calculateResearchTime,
+  getResearchTree,
+  startResearchNode,
   resolveCompletedResearch,
-  startResearch
+  getPlayerBonusTotals
 };

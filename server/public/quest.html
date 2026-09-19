@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quest</title>
+
+<style>
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background:
+            radial-gradient(circle at center, rgba(90,70,45,.35), transparent 55%),
+            #17130f;
+        font-family: Georgia, "Times New Roman", serif;
+        color: #ead9b5;
+    }
+
+    /* The actual quest window */
+    .quest-window {
+        position: relative;
+        width: min(920px, 94vw);
+        min-height: 500px;
+        display: grid;
+        grid-template-columns: 43% 57%;
+        overflow: hidden;
+
+        background:
+            linear-gradient(135deg, rgba(61,45,31,.98), rgba(28,23,19,.98));
+
+        border: 2px solid #8e6d3d;
+        box-shadow:
+            0 0 0 5px rgba(20,16,12,.85),
+            0 18px 60px rgba(0,0,0,.75),
+            inset 0 0 35px rgba(0,0,0,.55);
+
+        border-radius: 5px;
+    }
+
+    /* Decorative inner border */
+    .quest-window::before {
+        content: "";
+        position: absolute;
+        inset: 9px;
+        border: 1px solid rgba(180,145,82,.45);
+        pointer-events: none;
+        z-index: 5;
+    }
+
+    /* Portrait area */
+    .portrait {
+        position: relative;
+        min-height: 500px;
+        overflow: hidden;
+
+        background: #261e17;
+        border-right: 1px solid #806039;
+    }
+
+    .portrait img {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center top;
+
+        filter: saturate(.92) contrast(1.04);
+    }
+
+    /* Darkens the lower-left edge so the portrait blends into the dialog */
+    .portrait::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+            linear-gradient(to right, transparent 65%, rgba(28,23,19,.85)),
+            linear-gradient(to top, rgba(22,17,13,.9), transparent 45%);
+        pointer-events: none;
+    }
+
+    .portrait-name {
+        position: absolute;
+        z-index: 3;
+        left: 28px;
+        bottom: 25px;
+
+        padding: 8px 18px;
+
+        background: rgba(27,20,15,.82);
+        border-left: 3px solid #b58a45;
+
+        color: #f0dfb8;
+        font-size: 22px;
+        letter-spacing: 1px;
+        text-shadow: 0 2px 3px #000;
+    }
+
+    .portrait-title {
+        display: block;
+        margin-top: 3px;
+
+        color: #bda06d;
+        font-family: Arial, sans-serif;
+        font-size: 11px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+    }
+
+    /* Conversation area */
+    .dialog {
+        position: relative;
+        padding: 48px 48px 34px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .quest-label {
+        color: #b58a45;
+        font-family: Arial, sans-serif;
+        font-size: 11px;
+        font-weight: bold;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        margin-bottom: 8px;
+    }
+
+    h1 {
+        margin: 0 0 25px;
+        color: #f1dfb7;
+        font-size: clamp(30px, 4vw, 42px);
+        font-weight: normal;
+        line-height: 1.05;
+        text-shadow: 0 2px 3px #000;
+    }
+
+    .dialog-text {
+        color: #d4c4a4;
+        font-size: 17px;
+        line-height: 1.65;
+        margin-bottom: 22px;
+    }
+
+    .dialog-text em {
+        color: #e5d19e;
+    }
+
+    .quest-objective {
+        margin: 8px 0 28px;
+        padding: 14px 16px;
+
+        background: rgba(0,0,0,.22);
+        border: 1px solid rgba(155,120,65,.45);
+        border-left: 3px solid #9b753d;
+    }
+
+    .objective-label {
+        display: block;
+        margin-bottom: 5px;
+
+        color: #a98855;
+        font-family: Arial, sans-serif;
+        font-size: 10px;
+        font-weight: bold;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+    }
+
+    .objective-text {
+        color: #e2d2af;
+        font-size: 15px;
+    }
+
+    .actions {
+        display: flex;
+        gap: 12px;
+        margin-top: auto;
+    }
+
+    button {
+        padding: 12px 25px;
+        border: 1px solid #9a753e;
+        border-radius: 2px;
+
+        background: linear-gradient(#6f5431, #44321f);
+        color: #f0dfb8;
+
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 15px;
+        cursor: pointer;
+
+        box-shadow: inset 0 1px rgba(255,255,255,.12);
+        transition: .15s ease;
+    }
+
+    button:hover {
+        background: linear-gradient(#896a3d, #574126);
+        transform: translateY(-1px);
+    }
+
+    button.primary {
+        background: linear-gradient(#9b753c, #654a29);
+        border-color: #c29a57;
+    }
+
+    button.primary:hover {
+        background: linear-gradient(#b0874a, #76582f);
+    }
+
+    .close {
+        position: absolute;
+        top: 17px;
+        right: 19px;
+        z-index: 10;
+
+        width: 28px;
+        height: 28px;
+        padding: 0;
+
+        border: 1px solid rgba(180,145,82,.55);
+        background: rgba(0,0,0,.35);
+        color: #c8ae7d;
+
+        font-family: Arial, sans-serif;
+        font-size: 19px;
+        line-height: 25px;
+    }
+
+    .close:hover {
+        color: white;
+        background: rgba(100,70,35,.7);
+    }
+
+    /* Small screens */
+    @media (max-width: 700px) {
+        .quest-window {
+            grid-template-columns: 1fr;
+            width: 94vw;
+        }
+
+        .portrait {
+            min-height: 360px;
+            height: 360px;
+            border-right: 0;
+            border-bottom: 1px solid #806039;
+        }
+
+        .dialog {
+            min-height: 390px;
+            padding: 35px 28px 28px;
+        }
+
+        .portrait img {
+            object-position: center 18%;
+        }
+    }
+	/* Switch quest-window to vertical layout */
+.quest-window {
+    display: flex;
+    flex-direction: column;
+    width: min(920px, 94vw);
+    min-height: 500px;
+    position: relative;
+    overflow: hidden;
+
+    background: linear-gradient(135deg, rgba(61,45,31,.98), rgba(28,23,19,.98));
+    border: 2px solid #8e6d3d;
+    box-shadow:
+        0 0 0 5px rgba(20,16,12,.85),
+        0 18px 60px rgba(0,0,0,.75),
+        inset 0 0 35px rgba(0,0,0,.55);
+    border-radius: 5px;
+}
+
+/* Portrait now top-aligned */
+.portrait-top {
+    width: 100%;
+    height: 320px;
+    border-right: none;
+    border-bottom: 1px solid #806039;
+    position: relative;
+}
+
+/* Tabs */
+.quest-tabs {
+    display: flex;
+    justify-content: center;
+    gap: 18px;
+    padding: 14px 0;
+    background: rgba(0,0,0,.25);
+    border-bottom: 1px solid rgba(155,120,65,.45);
+}
+
+.quest-tabs .tab {
+    padding: 10px 22px;
+    background: rgba(40,30,20,.55);
+    border: 1px solid #9a753e;
+    color: #e8d5b2;
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: .15s ease;
+}
+
+.quest-tabs .tab:hover {
+    background: rgba(60,45,30,.75);
+}
+
+.quest-tabs .tab.active {
+    background: linear-gradient(#9b753c, #654a29);
+    border-color: #c29a57;
+    color: #fff2d0;
+}
+
+</style>
+</head>
+
+<body>
+
+<<div class="quest-window" id="questWindow">
+
+    <button class="close" onclick="closeQuest()" aria-label="Close quest">×</button>
+
+
+    <!-- Quest Tabs -->
+    <div class="quest-tabs">
+        <button class="tab active" onclick="showTab('starter')">STARTER</button>
+        <button class="tab" onclick="showTab('daily')">DAILY</button>
+        <button class="tab" onclick="showTab('lord')">LORD</button>
+    </div>
+
+    <!-- Dialog content -->
+    <div class="dialog" id="dialogContent">
+        <!-- Your existing quest content goes here -->
+    </div>
+
+</div>
+
+<script>
+    function acceptQuest() {
+        console.log("Quest accepted: broken_road");
+        // Replace this later with your game's API call.
+        closeQuest();
+    }
+
+    function declineQuest() {
+        console.log("Quest declined: broken_road");
+        closeQuest();
+    }
+
+    function closeQuest() {
+        document.getElementById("questWindow").style.display = "none";
+    }
+	
+	function showTab(tabName) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    event.target.classList.add('active');
+
+    // Later you will replace this with your quest loader
+    document.getElementById("dialogContent").innerHTML =
+        `<div class="dialog-text">Loaded ${tabName} quests...</div>`;
+}
+</script>
+
+</body>
+</html>

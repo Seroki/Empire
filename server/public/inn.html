@@ -1,0 +1,287 @@
+Inn · HTML
+<!-- Inn Modal Container -->
+<div id="inn-modal" class="modal-overlay hidden">
+  <div class="modal-content inn-content">
+    <div class="modal-header">
+      <div class="header-title-group">
+        <h2>Inn (Level <span id="inn-level-display">1</span>)</h2>
+        <span class="sub-header-info">Hero Pool Capacity: <span id="inn-pool-capacity">3</span> Candidates</span>
+      </div>
+      <button class="close-btn" onclick="closeInnGui()">&times;</button>
+    </div>
+
+    <!-- Active Inn Banner & Pool Status -->
+    <div class="inn-status-bar">
+      <div class="status-item">
+        <span class="label">Max Tier Available:</span>
+        <span class="value" id="max-hero-tier">Tier I (Common)</span>
+      </div>
+      <div class="status-item">
+        <span class="label">Pool Refresh:</span>
+        <span class="value" id="refresh-timer">00:00:00</span>
+      </div>
+      <button class="btn-secondary" onclick="refreshHeroPool()">Refresh Candidates (Gold: 1,000)</button>
+    </div>
+
+    <!-- Hero Pool List -->
+    <div id="hero-pool-container" class="hero-list">
+      <!-- Dynamically rendered candidate rows -->
+    </div>
+  </div>
+</div>
+
+<!-- Alert / Requirements Pop-up -->
+<div id="inn-alert-popup" class="popup-overlay hidden">
+  <div class="popup-box">
+    <h3 id="inn-popup-title">Recruitment Warning</h3>
+    <p id="inn-popup-message"></p>
+    <button onclick="closeInnPopup()">OK</button>
+  </div>
+</div>
+
+<style>
+  .hidden { display: none !important; }
+
+  .modal-overlay, .popup-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.75); display: flex; align-items: center; justify-content: center;
+    z-index: 1000;
+  }
+
+  /* The modal itself now scrolls, so it can NEVER exceed whatever
+     viewport it's rendered in (full page, or a small embedded iframe)
+     without being silently clipped like before. width is now
+     responsive instead of a fixed 850px too. */
+  .inn-content {
+    background: #1c1815;
+    color: #e0d8c3;
+    width: 95%;
+    max-width: 700px;
+    max-height: 92vh;
+    overflow-y: auto;
+    padding: 16px;
+    border-radius: 8px;
+    border: 1px solid #4a3b2c;
+    box-sizing: border-box;
+  }
+
+  .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #3d3023; padding-bottom: 10px; }
+  .header-title-group h2 { margin: 0; color: #e2b041; font-family: sans-serif; font-size: 1.1em; }
+  .sub-header-info { font-size: 0.8em; color: #9a8a78; }
+  .close-btn { background: transparent; border: none; color: #9a8a78; font-size: 20px; cursor: pointer; }
+  .close-btn:hover { color: #e2b041; }
+
+  .inn-status-bar {
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;
+    background: #28211b; padding: 10px 14px; margin: 12px 0; border-radius: 6px; border: 1px solid #3a2e22;
+  }
+  .status-item .label { font-size: 0.8em; color: #a59582; display: block; }
+  .status-item .value { font-size: 0.95em; color: #f5e5c9; font-weight: bold; }
+
+  /* Simple list instead of a multi-column grid — one row per candidate,
+     stats laid out inline. Naturally short and never needs its own
+     independent scroll region; the outer .inn-content handles it. */
+  .hero-list { display: flex; flex-direction: column; gap: 8px; }
+
+  .hero-row {
+    background: #251e18;
+    border: 1px solid #3a2f24;
+    border-radius: 6px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .hero-row.rare { border-color: #3b82f6; background: #182232; }
+  .hero-row.legendary { border-color: #f59e0b; background: #2b2112; }
+
+  .hero-row-main { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .hero-name { font-size: 1em; font-weight: bold; color: #fff; margin: 0; }
+  .hero-tier-tag { font-size: 0.7em; padding: 2px 6px; border-radius: 4px; background: #3a2e22; color: #d4a030; font-weight: bold; }
+  .hero-tier-tag.rare { background: #1e3a8a; color: #93c5fd; }
+  .hero-tier-tag.legendary { background: #78350f; color: #fde68a; }
+
+  .hero-stats-inline { display: flex; gap: 10px; font-size: 0.8em; color: #a09080; }
+  .hero-stats-inline strong { color: #f0e0d0; }
+
+  .hero-row-action { display: flex; align-items: center; gap: 10px; }
+  .hero-cost { font-size: 0.8em; color: #e2b041; font-weight: bold; white-space: nowrap; }
+  .hire-btn {
+    background: #d4a030; color: #111; border: none; padding: 6px 14px;
+    font-weight: bold; cursor: pointer; border-radius: 4px; font-size: 0.85em; white-space: nowrap;
+  }
+  .hire-btn:hover { background: #f0be42; }
+  .hire-btn:disabled { background: #4a4035; color: #7a7065; cursor: not-allowed; }
+
+  .popup-box { background: #2a1a1a; border: 1px solid #ff4d4d; color: #fff; padding: 20px; border-radius: 6px; text-align: center; max-width: 350px; }
+  .popup-box button { margin-top: 15px; padding: 6px 20px; background: #ff4d4d; border: none; color: white; cursor: pointer; }
+  .btn-secondary { background: #4a3b2c; color: #f0e0d0; border: 1px solid #634f3c; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.85em; }
+  .btn-secondary:hover { background: #5c4a38; }
+</style>
+
+<script>
+let currentCityId = 1;
+let innData = null;
+
+/**
+ * 1. Open GUI & Fetch Inn Data
+ */
+async function openInnGui(cityId = 1) {
+  currentCityId = cityId;
+  document.getElementById('inn-modal').classList.remove('hidden');
+
+  try {
+    const res = await fetch(`/inn?cityId=${cityId}`);
+    const data = await res.json();
+
+    if (!data.success) {
+      showInnRequirementPopup('Error', data.error || 'Failed to load Inn candidate pool.');
+      return;
+    }
+
+    innData = data;
+    renderInnInterface();
+  } catch (err) {
+    showInnRequirementPopup('Error', 'Could not connect to the server.');
+  }
+}
+
+function closeInnGui() {
+  document.getElementById('inn-modal').classList.add('hidden');
+}
+
+/**
+ * 2. Render Candidates and Inn Status
+ */
+function renderInnInterface() {
+  if (!innData) return;
+
+  document.getElementById('inn-level-display').innerText = innData.innLevel || 1;
+  document.getElementById('inn-pool-capacity').innerText = innData.candidates ? innData.candidates.length : 0;
+  document.getElementById('max-hero-tier').innerText = innData.maxTierName || 'Tier I (Common)';
+
+  const container = document.getElementById('hero-pool-container');
+  container.innerHTML = '';
+
+  if (!innData.candidates || innData.candidates.length === 0) {
+    container.innerHTML = `<p style="text-align: center; color: #9a8a78; padding: 12px;">No candidates currently available in the tavern.</p>`;
+    return;
+  }
+
+  innData.candidates.forEach(hero => {
+    const row = document.createElement('div');
+    const tierClass = hero.tier ? hero.tier.toLowerCase() : 'common';
+    row.className = `hero-row ${tierClass}`;
+
+    row.innerHTML = `
+      <div class="hero-row-main">
+        <h3 class="hero-name">${hero.name}</h3>
+        <span class="hero-tier-tag ${tierClass}">${hero.tier || 'Common'}</span>
+        <div class="hero-stats-inline">
+          <span>Lv <strong>${hero.level || 1}</strong></span>
+          <span>Pol <strong>${hero.politics}</strong></span>
+          <span>Atk <strong>${hero.attack}</strong></span>
+          <span>Int <strong>${hero.intelligence}</strong></span>
+        </div>
+      </div>
+      <div class="hero-row-action">
+        <span class="hero-cost">${hero.hireCost.toLocaleString()}g</span>
+        <button class="hire-btn" onclick="hireCandidate(${hero.id}, ${hero.hireCost})">Recruit</button>
+      </div>
+    `;
+
+    container.appendChild(row);
+  });
+}
+
+/**
+ * 3. Candidate Recruitment & Validation
+ */
+async function hireCandidate(candidateId, hireCost) {
+  if (!innData || !innData.resources) {
+    showInnRequirementPopup('Error', 'City state uninitialized.');
+    return;
+  }
+
+  // Check 1: Gold Available
+  if (innData.resources.gold < hireCost) {
+    showInnRequirementPopup('Insufficient Gold', `You need ${hireCost.toLocaleString()} Gold to hire this hero. Current Gold: ${innData.resources.gold.toLocaleString()}`);
+    return;
+  }
+
+  // Check 2: Feasting Hall / Hero Cap Space
+  if (innData.currentHeroCount >= innData.maxHeroCap) {
+    showInnRequirementPopup('Feasting Hall Full', `Your Feasting Hall capacity is full (${innData.currentHeroCount}/${innData.maxHeroCap}). Upgrade your Feasting Hall to hire more heroes.`);
+    return;
+  }
+
+  try {
+    const res = await fetch('/inn/hire', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cityId: currentCityId,
+        candidateId: candidateId
+      })
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      showInnRequirementPopup('Recruitment Failed', data.error || 'The hero left the tavern.');
+    } else {
+      openInnGui(currentCityId); // Refresh pool and resources
+    }
+  } catch (err) {
+    showInnRequirementPopup('Error', 'Failed to communicate with the server.');
+  }
+}
+
+/**
+ * 4. Manual Pool Refresh Request
+ */
+async function refreshHeroPool() {
+  const refreshCost = 1000;
+  if (innData && innData.resources && innData.resources.gold < refreshCost) {
+    showInnRequirementPopup('Insufficient Gold', `Manual refresh requires ${refreshCost} Gold.`);
+    return;
+  }
+
+  try {
+    const res = await fetch('/inn/refresh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cityId: currentCityId })
+    });
+
+    const data = await res.json();
+    if (!data.success) {
+      showInnRequirementPopup('Refresh Failed', data.error);
+    } else {
+      openInnGui(currentCityId);
+    }
+  } catch (err) {
+    showInnRequirementPopup('Error', 'Failed to refresh tavern pool.');
+  }
+}
+
+// Dialog Handlers
+function showInnRequirementPopup(title, message) {
+  document.getElementById('inn-popup-title').innerText = title;
+  document.getElementById('inn-popup-message').innerText = message;
+  document.getElementById('inn-alert-popup').classList.remove('hidden');
+}
+
+function closeInnPopup() {
+  document.getElementById('inn-alert-popup').classList.add('hidden');
+}
+
+// Auto-open when visiting inn.html directly in browser
+document.addEventListener("DOMContentLoaded", () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const cityId = urlParams.get('cityId') || 1;
+  openInnGui(cityId);
+});
+</script>

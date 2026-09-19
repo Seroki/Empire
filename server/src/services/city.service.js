@@ -49,19 +49,22 @@ async function saveResources(resources) {
             stone = $3,
             iron = $4,
             gold = $5,
-            workers = $6,
-            population = $7,
-            updated_at = NOW()
-        WHERE city_id = $8
+            gold_remainder = $6,
+            workers = $7,
+            population = $8,
+            updated_at = NOW(),
+            gold_updated_at = NOW()
+        WHERE city_id = $9
         `,
         [
-            resources.food,
-            resources.wood,
-            resources.stone,
-            resources.iron,
-            resources.gold,
-            resources.workers,
-            resources.population,
+            Math.floor(resources.food),
+            Math.floor(resources.wood),
+            Math.floor(resources.stone),
+            Math.floor(resources.iron),
+            Math.floor(resources.gold),
+            resources.goldRemainder || 0,
+            Math.floor(resources.workers),
+            Math.floor(resources.population),
             resources.city_id
         ]
     );
@@ -187,6 +190,13 @@ async function getStockpileCapacity(cityId) {
 }
 
 
+// NOTE: Confirmed dead code as of this diagnostic session — index.html's
+// collectResource() action calls POST /buildings/collect/:cityId/:buildingId,
+// which routes to building.service.js's collectResource (the version with
+// valley/research/mayor bonuses correctly wired). Nothing in the frontend
+// hits a route shaped to reach this function. Left in place rather than
+// deleted pending confirmation no other route file references it — see
+// open item "duplicate collectResource" in session handoff notes.
 async function collectResource(cityId, buildingId) {
     const client = await db.connect();
 
@@ -273,7 +283,7 @@ function computePopulation(buildings) {
 }
 
 
-function computeLiveResources(resources, buildings) {
+async function computeLiveResources(resources, buildings, cityId) {
     if (!resources || !resources.updated_at) return resources;
 
     const now = Date.now();
@@ -282,16 +292,41 @@ function computeLiveResources(resources, buildings) {
     const hoursElapsed = Math.max(0, (now - last) / 3600000);
 
     const { basePopulation, cottagesPopulation, totalPopulation } = computePopulation(buildings);
-    
     const workers = Math.floor(cottagesPopulation * WORKER_RATIO) + STARTING_POPULATION;
-
     const taxRate = Number(resources.tax_rate) || 0;
     const currentGold = Number(resources.gold) || 0;
-    const goldPH = workers * GOLD_PER_WORKER_PER_HOUR * (taxRate / 100);
+
+    // Gold uses its OWN dedicated clock (gold_updated_at), mirroring
+    // building.service.js's getSettledResources and for the same reason:
+    // updated_at gets bumped by THIS function's own saveResources() call on
+    // every 5s refresh() poll from index.html, plus by unrelated spends
+    // (research, training, upgrades). Using updated_at for gold's elapsed
+    // time would collapse gold accrual toward zero on almost every call.
+    const goldLastParsed = Date.parse(resources.gold_updated_at);
+    const goldLast = Number.isNaN(goldLastParsed) ? now : goldLastParsed;
+    const goldHoursElapsed = Math.max(0, (now - goldLast) / 3600000);
+
+    // TAX_EFFICIENCY research bonus + the shared gold formula both now live
+    // in building.service.js as the single source of truth, so this file
+    // and building.service.js's getSettledResources can never drift apart
+    // on how gold is computed again. computeGoldAccrual returns
+    // { gold, goldRemainder } — NOT a plain number — because the gold
+    // column is a bigint and truncating on every save would otherwise
+    // silently discard the fractional gold earned each tick.
+    const taxEfficiencyPct = await buildingService.getResearchProductionBonusPct(cityId, 'TAX_EFFICIENCY');
+    const { gold, goldRemainder } = buildingService.computeGoldAccrual({
+        currentGold,
+        goldRemainder: Number(resources.gold_remainder) || 0,
+        workers,
+        taxRate,
+        taxEfficiencyPct,
+        hoursElapsed: goldHoursElapsed
+    });
 
     return {
         ...resources,
-        gold: currentGold + goldPH * hoursElapsed,
+        gold,
+        goldRemainder,
         workers,
         population: totalPopulation,
         basePopulation,
@@ -380,7 +415,7 @@ async function getFullCityState(cityId) {
     const buildings = await getBuildings(cityId);
 
     // 4. Compute continuous live resources (gold accrual)
-    const liveResources = computeLiveResources(rawResources, buildings);
+    const liveResources = await computeLiveResources(rawResources, buildings, cityId);
     await saveResources(liveResources);
 
     const displayResources = {
@@ -389,7 +424,8 @@ async function getFullCityState(cityId) {
         wood: Math.floor(Number(liveResources.wood) || 0),
         stone: Math.floor(Number(liveResources.stone) || 0),
         iron: Math.floor(Number(liveResources.iron) || 0),
-        gold: Math.floor(Number(liveResources.gold) || 0)
+        gold: Math.floor(Number(liveResources.gold) || 0),
+        cottageCap: liveResources.cottagesPopulation
     };
 
     // 5. Fetch peripheral UI state
@@ -399,7 +435,7 @@ async function getFullCityState(cityId) {
     const stockpileCapacity = await getStockpileCapacity(cityId);
 
     // 6. Compute Warehouse Protected vs At-Risk amounts
-    const totalStored = 
+    const totalStored =
         displayResources.food +
         displayResources.wood +
         displayResources.stone +
@@ -426,6 +462,173 @@ async function getFullCityState(cityId) {
         availableBuildings
     };
 }
+// ============================================================================
+// PLACEHOLDER LEVY POOL CONSTANTS — not balanced, just enough to make the
+// system functional. Tune these once real numbers are decided.
+// ============================================================================
+const BASE_LEVY_CAP = 100;                       // levy pool ceiling, normal conditions
+const LEVY_REFILL_PER_HOUR = 10;                 // levy points regenerated per hour, normal
+const CALL_TO_ARMS_CAP_MULTIPLIER = 2;            // "expands your Levy cap"
+const CALL_TO_ARMS_REFILL_MULTIPLIER = 2;         // "doubles refill speed"
+const CALL_TO_ARMS_LOYALTY_DRAIN_PER_DAY = 5;     // "drains Loyalty ... daily"
+const CALL_TO_ARMS_HAPPINESS_DRAIN_PER_DAY = 5;   // "drains ... Happiness daily"
+
+
+/**
+ * Settles pending gold accrual for a city and persists it, same
+ * compute-then-save pattern getFullCityState already uses — just callable
+ * standalone for places (like market.service.js) that need current gold
+ * without loading the entire city state.
+ */
+async function resolveGoldIncome(cityId) {
+    // No changes needed below — computeLiveResources now returns
+    // goldRemainder on its result object, and saveResources persists it.
+    const rawResources = await getResources(cityId);
+    if (!rawResources) {
+        throw new Error("City resources not found");
+    }
+    const buildings = await getBuildings(cityId);
+    const liveResources = await computeLiveResources(rawResources, buildings, cityId);
+    await saveResources(liveResources);
+    return liveResources;
+}
+
+
+/**
+ * Settles pending Levy Pool refill for a city and persists it. PLACEHOLDER
+ * mechanics (see constants above) — refills linearly over time up to a cap,
+ * both doubled while Call to Arms is active, which also drains Loyalty and
+ * Happiness proportionally to time elapsed.
+ */
+async function resolveLevyPool(cityId) {
+    const client = await db.connect();
+    try {
+        await client.query("BEGIN");
+
+        const result = await client.query(
+            `SELECT * FROM city_resources WHERE city_id = $1 FOR UPDATE`,
+            [cityId]
+        );
+        if (result.rows.length === 0) {
+            throw new Error("City resources not found");
+        }
+        const resources = result.rows[0];
+
+        const now = Date.now();
+        const lastParsed = Date.parse(resources.levy_updated_at);
+        const last = Number.isNaN(lastParsed) ? now : lastParsed;
+        const hoursElapsed = Math.max(0, (now - last) / 3600000);
+
+        const callToArmsActive = Boolean(resources.call_to_arms_active);
+        const levyCap = BASE_LEVY_CAP * (callToArmsActive ? CALL_TO_ARMS_CAP_MULTIPLIER : 1);
+        const refillPerHour = LEVY_REFILL_PER_HOUR * (callToArmsActive ? CALL_TO_ARMS_REFILL_MULTIPLIER : 1);
+
+        const currentLevyPool = Number(resources.levy_pool) || 0;
+        const newLevyPool = Math.min(levyCap, currentLevyPool + refillPerHour * hoursElapsed);
+
+        let newLoyalty = Number(resources.loyalty) || 0;
+        let newHappiness = Number(resources.happiness) || 0;
+        if (callToArmsActive) {
+            newLoyalty = Math.max(0, newLoyalty - (CALL_TO_ARMS_LOYALTY_DRAIN_PER_DAY / 24) * hoursElapsed);
+            newHappiness = Math.max(0, newHappiness - (CALL_TO_ARMS_HAPPINESS_DRAIN_PER_DAY / 24) * hoursElapsed);
+        }
+
+        const updateResult = await client.query(
+            `
+            UPDATE city_resources
+            SET levy_pool = $1,
+                levy_updated_at = NOW(),
+                loyalty = $2,
+                happiness = $3
+            WHERE city_id = $4
+            RETURNING *
+            `,
+            [Math.floor(newLevyPool), Math.round(newLoyalty), Math.round(newHappiness), cityId]
+        );
+
+        await client.query("COMMIT");
+
+        return { ...updateResult.rows[0], levy_cap: levyCap };
+    } catch (err) {
+        await client.query("ROLLBACK");
+        throw err;
+    } finally {
+        client.release();
+    }
+}
+
+
+/**
+ * Assigns a hero as this city's mayor, unsetting any previous mayor first
+ * (only one mayor per city at a time — matches the Feasting Hall UI's
+ * single-select radio button behavior).
+ */
+async function assignMayor(cityId, heroId) {
+    const client = await db.connect();
+    try {
+        await client.query("BEGIN");
+
+        const heroCheck = await client.query(
+            `SELECT id FROM heroes WHERE id = $1 AND city_id = $2`,
+            [heroId, cityId]
+        );
+        if (heroCheck.rows.length === 0) {
+            throw new Error("Hero not found in this city");
+        }
+
+        await client.query(
+            `UPDATE heroes SET is_mayor = false WHERE city_id = $1`,
+            [cityId]
+        );
+        await client.query(
+            `UPDATE heroes SET is_mayor = true WHERE id = $1`,
+            [heroId]
+        );
+
+        await client.query("COMMIT");
+        return { success: true, mayorId: heroId };
+    } catch (err) {
+        await client.query("ROLLBACK");
+        throw err;
+    } finally {
+        client.release();
+    }
+}
+
+
+async function getMayorPoliticsBuff(cityId) {
+    const result = await db.query(
+        `SELECT politics FROM heroes WHERE city_id = $1 AND is_mayor = true LIMIT 1`,
+        [cityId]
+    );
+    const politics = Number(result.rows[0]?.politics) || 0;
+    return 1 + (politics / 100);
+}
+
+
+/**
+ * Releases a hero from active service — unassigns them from the city and
+ * clears mayor status, but keeps the hero record itself (not a deletion).
+ * The hero becomes available to be recruited/assigned again later.
+ */
+async function releaseHero(cityId, heroId) {
+    const result = await db.query(
+        `
+        UPDATE heroes
+        SET city_id = NULL,
+            is_mayor = false,
+            hired = false,
+            status = 'RELEASED'
+        WHERE id = $1 AND city_id = $2
+        RETURNING id, name
+        `,
+        [heroId, cityId]
+    );
+    if (result.rows.length === 0) {
+        throw new Error("Hero not found in this city");
+    }
+    return { success: true, released: result.rows[0] };
+}
 
 
 module.exports = {
@@ -449,5 +652,10 @@ module.exports = {
     getQueue,
     getAvailableBuildings,
     processCompletedQueue,
-    getFullCityState
+    getFullCityState,
+    releaseHero,
+    resolveGoldIncome,
+    resolveLevyPool,
+    assignMayor,
+    getMayorPoliticsBuff
 };

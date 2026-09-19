@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Empire Core — Hospital</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #14110d;
+    --panel: #1e1912;
+    --panel-raised: #241e15;
+    --line: #3d3020;
+    --brass: #c89b3c;
+    --brass-dim: #8a6e2c;
+    --green: #6b8f5a;
+    --rust: #a8462e;
+    --parchment: #eae0cb;
+    --faded: #8a7c63;
+
+    --font-display: 'Cinzel', serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ink);
+    background-image: radial-gradient(ellipse at top, rgba(200,155,60,0.06), transparent 60%);
+    color: var(--parchment);
+    font-family: var(--font-mono);
+    padding: 10px;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    background: var(--panel-raised);
+    border: 1px solid var(--line);
+    margin-bottom: 10px;
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    color: var(--brass);
+    font-size: 18px;
+    margin: 0;
+    letter-spacing: 0.03em;
+  }
+
+  .capacity-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+  }
+
+  .capacity-bar {
+    width: 160px;
+    height: 10px;
+    background: var(--ink);
+    border: 1px solid var(--line);
+    overflow: hidden;
+  }
+  .capacity-bar-fill {
+    height: 100%;
+    background: var(--green);
+    transition: width 0.3s ease;
+  }
+  .capacity-bar-fill.full { background: var(--rust); }
+
+  .section-header {
+    font-family: var(--font-display);
+    color: var(--brass);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    padding: 6px 8px;
+    background: var(--panel-raised);
+    border: 1px solid var(--line);
+    margin: 14px 0 6px;
+  }
+  .section-header .hint {
+    font-family: var(--font-mono);
+    color: var(--faded);
+    font-size: 10px;
+    letter-spacing: normal;
+  }
+
+  .wounded-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    font-size: 12px;
+  }
+  .wounded-row.healing { border-left: 3px solid var(--green); }
+  .wounded-row.admitted { border-left: 3px solid var(--brass); }
+  .wounded-row.queued { border-left: 3px solid var(--rust); }
+
+  .wounded-info { display: flex; flex-direction: column; gap: 2px; }
+  .wounded-name { color: var(--parchment); }
+  .wounded-meta { color: var(--faded); font-size: 10px; }
+
+  .timer { color: var(--brass); font-size: 11px; min-width: 70px; text-align: right; }
+  .timer.urgent { color: var(--rust); }
+
+  .action-btn {
+    background: var(--panel-raised);
+    border: 1px solid var(--brass-dim);
+    color: var(--brass);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    padding: 5px 10px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+  }
+  .action-btn:hover:not(:disabled) {
+    background: var(--brass);
+    color: var(--ink);
+  }
+  .action-btn:disabled {
+    border-color: var(--line);
+    color: var(--faded);
+    cursor: not-allowed;
+    background: transparent;
+  }
+
+  .empty-state {
+    color: var(--faded);
+    font-size: 11px;
+    padding: 10px;
+    text-align: center;
+    border: 1px dashed var(--line);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Hospital</h1>
+  <div class="capacity-wrap">
+    <span id="capacity-label">0 / 0</span>
+    <div class="capacity-bar"><div class="capacity-bar-fill" id="capacity-fill" style="width:0%"></div></div>
+  </div>
+</header>
+
+<div class="section-header">Healing <span class="hint">— recovering, timer running</span></div>
+<div id="healing-list"><div class="empty-state">No troops currently healing.</div></div>
+
+<div class="section-header">Awaiting Treatment <span class="hint">— has a bed, needs payment to start</span></div>
+<div id="admitted-list"><div class="empty-state">No wounded awaiting treatment.</div></div>
+
+<div class="section-header">Incoming <span class="hint">— waiting for a free bed, lost if the hospital doesn't clear in time</span></div>
+<div id="queued-list"><div class="empty-state">No wounded waiting on capacity.</div></div>
+
+<script>
+const API_BASE = "";
+const params = new URLSearchParams(window.location.search);
+const cityId = params.get("cityId") ? Number(params.get("cityId")) : null;
+
+async function fetchJson(url, options) {
+  try {
+    const res = await fetch(url, options);
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    console.error("Hospital fetch error:", err);
+    return null;
+  }
+}
+
+function formatDuration(ms) {
+  if (ms <= 0) return "any moment";
+  const totalSeconds = Math.floor(ms / 1000);
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function makeHealingRow(w) {
+  const remaining = new Date(w.heal_complete_at).getTime() - Date.now();
+  return `
+    <div class="wounded-row healing">
+      <div class="wounded-info">
+        <span class="wounded-name">${w.quantity}x ${w.unit_name}</span>
+        <span class="wounded-meta">from ${w.source.toLowerCase()}</span>
+      </div>
+      <span class="timer">${formatDuration(remaining)}</span>
+    </div>
+  `;
+}
+
+function makeAdmittedRow(w) {
+  return `
+    <div class="wounded-row admitted">
+      <div class="wounded-info">
+        <span class="wounded-name">${w.quantity}x ${w.unit_name}</span>
+        <span class="wounded-meta">from ${w.source.toLowerCase()} — bed reserved</span>
+      </div>
+      <button class="action-btn" onclick="payToHeal(${w.id})">Pay to Heal</button>
+    </div>
+  `;
+}
+
+function makeQueuedRow(w) {
+  const remaining = new Date(w.expires_at).getTime() - Date.now();
+  const urgent = remaining < 5 * 60 * 1000;
+  return `
+    <div class="wounded-row queued">
+      <div class="wounded-info">
+        <span class="wounded-name">${w.quantity}x ${w.unit_name}</span>
+        <span class="wounded-meta">from ${w.source.toLowerCase()} — no bed free yet</span>
+      </div>
+      <span class="timer ${urgent ? "urgent" : ""}">${formatDuration(remaining)}</span>
+    </div>
+  `;
+}
+
+async function payToHeal(woundedId) {
+  const costPreview = await fetchJson(`${API_BASE}/hospital/${cityId}/heal-cost/${woundedId}`);
+  if (!costPreview || !costPreview.success) {
+    alert(costPreview?.error || "Couldn't calculate healing cost.");
+    return;
+  }
+  if (!confirm(`Heal ${costPreview.quantity} troop(s) for ${costPreview.actualCost} gold?`)) return;
+
+  const result = await fetchJson(`${API_BASE}/hospital/${cityId}/heal/${woundedId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" }
+  });
+  if (!result || !result.success) {
+    alert(result?.error || "Couldn't start healing.");
+    return;
+  }
+  await refresh();
+}
+
+async function refresh() {
+  if (!cityId) return;
+  const data = await fetchJson(`${API_BASE}/hospital/${cityId}`);
+  if (!data || !data.success) return;
+
+  const healing = data.roster.filter(w => w.status === "HEALING");
+  const admitted = data.roster.filter(w => w.status === "ADMITTED");
+  const queued = data.roster.filter(w => w.status === "QUEUED");
+
+  document.getElementById("healing-list").innerHTML =
+    healing.length ? healing.map(makeHealingRow).join("") : `<div class="empty-state">No troops currently healing.</div>`;
+  document.getElementById("admitted-list").innerHTML =
+    admitted.length ? admitted.map(makeAdmittedRow).join("") : `<div class="empty-state">No wounded awaiting treatment.</div>`;
+  document.getElementById("queued-list").innerHTML =
+    queued.length ? queued.map(makeQueuedRow).join("") : `<div class="empty-state">No wounded waiting on capacity.</div>`;
+
+  const used = healing.reduce((s, w) => s + w.quantity, 0) + admitted.reduce((s, w) => s + w.quantity, 0);
+  const capacity = data.capacity || 0;
+  document.getElementById("capacity-label").textContent = `${used} / ${capacity}`;
+  const pct = capacity > 0 ? Math.min(100, Math.round((used / capacity) * 100)) : 0;
+  const fill = document.getElementById("capacity-fill");
+  fill.style.width = `${pct}%`;
+  fill.classList.toggle("full", pct >= 100);
+}
+
+refresh();
+setInterval(refresh, 5000);
+</script>
+
+</body>
+</html>

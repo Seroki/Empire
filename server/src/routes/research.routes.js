@@ -8,5 +8,6 @@ const authenticateToken = (req, res, next) => next();
 
 router.get('/', authenticateToken, researchController.getResearchTree);
 router.post('/start', authenticateToken, researchController.startResearch);
+router.get('/bonuses', authenticateToken, researchController.getBonusTotals);
 
 module.exports = router;

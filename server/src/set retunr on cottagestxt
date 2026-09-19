@@ -1,0 +1,29 @@
+BEGIN;
+
+ALTER TABLE city_resources
+ADD COLUMN IF NOT EXISTS tax_rate INTEGER NOT NULL DEFAULT 30;
+
+ALTER TABLE city_resources
+ADD COLUMN IF NOT EXISTS population INTEGER NOT NULL DEFAULT 200;
+
+ALTER TABLE building_levels
+ADD COLUMN IF NOT EXISTS population_capacity INTEGER NOT NULL DEFAULT 0;
+
+-- Cottage population capacity by level
+UPDATE building_levels
+SET population_capacity = CASE level
+    WHEN 1 THEN 200
+    WHEN 2 THEN 200
+    WHEN 3 THEN 200
+    WHEN 4 THEN 200
+    WHEN 5 THEN 200
+    WHEN 6 THEN 200
+    WHEN 7 THEN 200
+    WHEN 8 THEN 200
+    WHEN 9 THEN 200
+    WHEN 10 THEN 200
+    ELSE 0
+END
+WHERE building_type_id = 1;
+
+COMMIT;

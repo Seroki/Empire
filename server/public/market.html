@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Marketplace & Trade</title>
+  <style>
+    :root {
+      --bg: #0d0b09;
+      --panel-bg: #1a1714;
+      --panel-raised: #24201c;
+      --ink: #0f0d0b;
+      --line: #3d3228;
+      --parchment: #e2d9c8;
+      --brass: #c8a050;
+      --brass-dim: #96783c;
+      --faded: #8c8275;
+      --rust: #8b3a2b;
+      --green: #5c8b3a;
+      --font-main: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-mono: "Courier New", Courier, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg);
+      color: var(--parchment);
+      font-family: var(--font-main);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 16px;
+    }
+
+    .window-panel {
+      width: 100%;
+      max-width: 820px;
+      background: var(--panel-bg);
+      border: 2px solid var(--line);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.8);
+    }
+
+    .window-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      background: var(--ink);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .window-header h1 {
+      font-size: 14px;
+      color: var(--brass);
+      text-transform: uppercase;
+      font-family: var(--font-mono);
+      letter-spacing: 1px;
+    }
+
+    .window-body { padding: 16px; }
+
+    .gold-box {
+      background: var(--panel-raised);
+      border: 1px solid var(--line);
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .gold-box .label {
+      font-size: 11px;
+      color: var(--faded);
+      text-transform: uppercase;
+      font-family: var(--font-mono);
+    }
+
+    .gold-box .val {
+      font-size: 16px;
+      font-weight: bold;
+      color: var(--brass);
+      font-family: var(--font-mono);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+      text-align: left;
+    }
+
+    th {
+      padding: 10px 8px;
+      color: var(--faded);
+      font-family: var(--font-mono);
+      border-bottom: 1px solid var(--line);
+      text-transform: uppercase;
+    }
+
+    td {
+      padding: 12px 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      vertical-align: middle;
+    }
+
+    .res-name {
+      font-size: 12px;
+      font-weight: bold;
+      color: var(--parchment);
+    }
+
+    .res-stock {
+      font-size: 10px;
+      color: var(--brass);
+      font-family: var(--font-mono);
+      margin-top: 2px;
+    }
+
+    .rate-tag {
+      font-size: 10px;
+      color: var(--faded);
+      margin-bottom: 4px;
+    }
+
+    .trade-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+
+    input[type="number"] {
+      width: 75px;
+      background: var(--ink);
+      color: var(--parchment);
+      border: 1px solid var(--line);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 4px 6px;
+    }
+
+    input[type="number"]:focus {
+      outline: 1px solid var(--brass);
+    }
+
+    .btn {
+      padding: 4px 10px;
+      font-size: 10px;
+      font-weight: bold;
+      border: 1px solid var(--line);
+      background: var(--panel-raised);
+      color: var(--parchment);
+      cursor: pointer;
+      text-transform: uppercase;
+    }
+
+    .btn-buy {
+      border-color: var(--brass);
+      color: var(--brass);
+    }
+
+    .btn-sell {
+      border-color: var(--green);
+      color: var(--green);
+    }
+
+    .btn:hover {
+      filter: brightness(1.2);
+    }
+
+    .preview-text {
+      font-size: 9px;
+      font-family: var(--font-mono);
+      color: var(--brass-dim);
+      min-height: 12px;
+    }
+
+    .rule-note {
+      margin-top: 16px;
+      font-size: 10px;
+      color: var(--faded);
+      text-align: center;
+      border-top: 1px solid var(--line);
+      padding-top: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="window-panel">
+    <div class="window-header">
+      <h1>🏛️ City Marketplace</h1>
+      <span id="market-city-tag" style="font-size: 11px; color: var(--faded); font-family: var(--font-mono);">City ID: --</span>
+    </div>
+
+    <div class="window-body" id="app">
+      <p style="text-align: center; color: var(--faded); font-size: 12px;">Connecting to trade exchange...</p>
+    </div>
+  </div>
+
+<script>
+  const API_BASE = window.API_BASE || "";
+  const urlParams = new URLSearchParams(window.location.search);
+  const currentCityId = urlParams.get("cityId") || 1;
+
+  // Marketplace core exchange definitions
+  const marketRates = {
+    food:   { name: "🌾 Food",   buyRate: 100, sellRate: 33 },
+    wood:   { name: "🪵 Wood",   buyRate: 150, sellRate: 49 },
+    stone:  { name: "🪨 Stone",  buyRate: 200, sellRate: 66 },
+    iron:   { name: "⛏️ Iron",   buyRate: 300, sellRate: 99 }
+  };
+
+  let currentCityData = {
+    gold: 0,
+    resources: { food: 0, wood: 0, stone: 0, iron: 0 }
+  };
+
+  async function loadMarketplace() {
+    const app = document.getElementById("app");
+    document.getElementById("market-city-tag").textContent = `City ID: ${currentCityId}`;
+
+    try {
+      const res = await fetch(`${API_BASE}/market/data?cityId=${currentCityId}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          currentCityData.gold = Number(data.gold || 0);
+          currentCityData.resources = {
+            food: Number(data.resources?.food || 0),
+            wood: Number(data.resources?.wood || 0),
+            stone: Number(data.resources?.stone || 0),
+            iron: Number(data.resources?.iron || 0)
+          };
+        }
+      }
+    } catch (e) {
+      console.warn("Backend API offline, loading default UI state.");
+    }
+
+    renderMarketplaceUI();
+  }
+
+  function renderMarketplaceUI() {
+    const app = document.getElementById("app");
+
+    let html = `
+      <div class="gold-box">
+        <span class="label">City Gold Available</span>
+        <span class="val">🪙 ${currentCityData.gold.toLocaleString()} Gold</span>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Resource</th>
+            <th>You Have</th>
+            <th>Buy (Gold → Resource)</th>
+            <th>Sell (Resource → Gold)</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    Object.keys(marketRates).forEach(key => {
+      const r = marketRates[key];
+      const owned = currentCityData.resources[key] || 0;
+
+      html += `
+        <tr>
+          <td>
+            <div class="res-name">${r.name}</div>
+          </td>
+          <td>
+            <div class="res-stock">${owned.toLocaleString()}</div>
+          </td>
+          <td>
+            <div class="trade-group">
+              <div class="rate-tag">${r.buyRate}g → 10 units</div>
+              <div class="input-row">
+                <input type="number" id="buy-gold-${key}" placeholder="Gold" step="${r.buyRate}" min="${r.buyRate}" oninput="updateBuyPreview('${key}')">
+                <button class="btn btn-buy" onclick="executeBuy('${key}')">Buy</button>
+              </div>
+              <div class="preview-text" id="buy-prev-${key}">0 Gold → 0 ${key}</div>
+            </div>
+          </td>
+          <td>
+            <div class="trade-group">
+              <div class="rate-tag">10 units → ${r.sellRate}g</div>
+              <div class="input-row">
+                <input type="number" id="sell-qty-${key}" placeholder="Amount" step="10" min="10" max="${owned}" oninput="updateSellPreview('${key}')">
+                <button class="btn btn-sell" onclick="executeSell('${key}')">Sell</button>
+              </div>
+              <div class="preview-text" id="sell-prev-${key}">0 ${key} → 0 Gold</div>
+            </div>
+          </td>
+        </tr>
+      `;
+    });
+
+    html += `
+        </tbody>
+      </table>
+
+      <div class="rule-note">
+        * Transactions operate strictly in 10-unit resource lots. Unused gold outside lot increments will not be deducted.
+      </div>
+    `;
+
+    app.innerHTML = html;
+  }
+
+  function updateBuyPreview(key) {
+    const input = document.getElementById(`buy-gold-${key}`);
+    const preview = document.getElementById(`buy-prev-${key}`);
+    const goldSpent = Math.max(0, Number(input.value) || 0);
+
+    const rate = marketRates[key].buyRate;
+    const lots = Math.floor(goldSpent / rate);
+    const actualGold = lots * rate;
+    const resourceGained = lots * 10;
+
+    preview.textContent = `${actualGold.toLocaleString()} Gold → ${resourceGained.toLocaleString()} ${key}`;
+  }
+
+  function updateSellPreview(key) {
+    const input = document.getElementById(`sell-qty-${key}`);
+    const preview = document.getElementById(`sell-prev-${key}`);
+    const resQty = Math.max(0, Number(input.value) || 0);
+
+    const rate = marketRates[key].sellRate;
+    const lots = Math.floor(resQty / 10);
+    const actualRes = lots * 10;
+    const goldGained = lots * rate;
+
+    preview.textContent = `${actualRes.toLocaleString()} ${key} → ${goldGained.toLocaleString()} Gold`;
+  }
+
+  async function executeBuy(key) {
+    const input = document.getElementById(`buy-gold-${key}`);
+    const goldSpent = Math.max(0, Number(input.value) || 0);
+    const rate = marketRates[key].buyRate;
+    const lots = Math.floor(goldSpent / rate);
+
+    if (lots <= 0) {
+      alert(`Minimum purchase requires at least ${rate} Gold (10 units).`);
+      return;
+    }
+
+    const actualGoldSpent = lots * rate;
+    if (actualGoldSpent > currentCityData.gold) {
+      alert("Insufficient Gold available in the city treasury.");
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/market/buy`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cityId: currentCityId,
+          resource: key,
+          goldSpent: actualGoldSpent
+        })
+      });
+
+      const result = await res.json();
+      if (res.ok && result.success) {
+        await loadMarketplace();
+        if (window.parent && typeof window.parent.refresh === "function") {
+          window.parent.refresh();
+        }
+      } else {
+        alert(result.error || "Buy order rejected.");
+      }
+    } catch (e) {
+      alert("Could not connect to trade server.");
+    }
+  }
+
+  async function executeSell(key) {
+    const input = document.getElementById(`sell-qty-${key}`);
+    const resQty = Math.max(0, Number(input.value) || 0);
+    const lots = Math.floor(resQty / 10);
+
+    if (lots <= 0) {
+      alert("Minimum sale requires at least 10 units.");
+      return;
+    }
+
+    const actualResSold = lots * 10;
+    const owned = currentCityData.resources[key] || 0;
+
+    if (actualResSold > owned) {
+      alert(`Insufficient ${key} available to sell.`);
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/market/sell`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cityId: currentCityId,
+          resource: key,
+          quantity: actualResSold
+        })
+      });
+
+      const result = await res.json();
+      if (res.ok && result.success) {
+        await loadMarketplace();
+        if (window.parent && typeof window.parent.refresh === "function") {
+          window.parent.refresh();
+        }
+      } else {
+        alert(result.error || "Sell order rejected.");
+      }
+    } catch (e) {
+      alert("Could not connect to trade server.");
+    }
+  }
+
+  loadMarketplace();
+</script>
+</body>
+</html>

@@ -1,93 +1,83 @@
 const researchService = require('../services/research.service');
+const pool = require('../database/db');
 
-// GET /api/research?cityId=1
+async function resolvePlayerIdFromCity(cityId) {
+  const result = await pool.query(`SELECT owner_id FROM cities WHERE id = $1`, [cityId]);
+  if (result.rows.length === 0) {
+    throw new Error("City not found");
+  }
+  return result.rows[0].owner_id;
+}
+
+// GET /research?cityId=1
 async function getResearchTree(req, res) {
   try {
-    const playerId = req.user.id; // derived from auth middleware
     const cityId = req.query.cityId ? parseInt(req.query.cityId, 10) : null;
+    if (!cityId) {
+      return res.status(400).json({ success: false, error: 'cityId is required.' });
+    }
 
-    // 1. First, resolve any completed research projects lazily
+    const playerId = await resolvePlayerIdFromCity(cityId);
+
+    // Resolve any completed research before reading state.
     await researchService.resolveCompletedResearch(playerId);
 
-    // 2. Fetch player's current completed tech levels
-    const playerTechsRes = await req.db.query(
-      `SELECT tech_code, level FROM player_researches WHERE player_id = $1`,
-      [playerId]
-    );
-
-    const playerTechMap = {};
-    for (const row of playerTechsRes.rows) {
-      playerTechMap[row.tech_code] = row.level;
-    }
-
-    // 3. Fetch active queue project
-    const activeQueueRes = await req.db.query(
-      `SELECT * FROM research_queue WHERE player_id = $1 AND status = 'IN_PROGRESS' LIMIT 1`,
-      [playerId]
-    );
-    const activeQueue = activeQueueRes.rows[0] || null;
-
-    // 4. Fetch local city Academy level if cityId provided
-    let academyLevel = 0;
-    if (cityId) {
-      const academyRes = await req.db.query(
-        `SELECT level FROM city_buildings WHERE city_id = $1 AND building_type_id = 6`,
-        [cityId]
-      );
-      academyLevel = academyRes.rows[0]?.level || 0;
-    }
-
-    // 5. Build response object combining global levels and effective levels
-    const tree = {};
-    for (const [code, config] of Object.entries(researchService.TECH_DEFINITIONS)) {
-      const globalLevel = playerTechMap[code] || 0;
-      const effectiveLevel = cityId ? researchService.getEffectiveTechLevel(globalLevel, academyLevel) : globalLevel;
-
-      tree[code] = {
-        ...config,
-        globalLevel,
-        effectiveLevel,
-        nextLevelCost: {
-          food: researchService.calculateTechCost(config.baseCost.food, globalLevel + 1),
-          wood: researchService.calculateTechCost(config.baseCost.wood, globalLevel + 1),
-          stone: researchService.calculateTechCost(config.baseCost.stone, globalLevel + 1),
-          iron: researchService.calculateTechCost(config.baseCost.iron, globalLevel + 1),
-          gold: researchService.calculateTechCost(config.baseCost.gold, globalLevel + 1)
-        }
-      };
-    }
+    const { academyLevel, activeQueue, tree } = await researchService.getResearchTree(playerId, cityId);
+    const bonusTotals = await researchService.getPlayerBonusTotals(playerId);
 
     return res.json({
       success: true,
-      activeQueue,
       academyLevel,
-      technologies: tree
+      activeQueue,
+      tree,
+      bonusTotals
     });
+  } catch (err) {
+    console.error(err); // TEMP - remove once confirmed stable
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+// GET /research/bonuses?cityId=1
+// Standalone lookup for other systems (building speed/cost, resource
+// production, combat, etc.) that need a player's current stacked research
+// bonuses without loading the whole tree.
+async function getBonusTotals(req, res) {
+  try {
+    const cityId = req.query.cityId ? parseInt(req.query.cityId, 10) : null;
+    if (!cityId) {
+      return res.status(400).json({ success: false, error: 'cityId is required.' });
+    }
+
+    const playerId = await resolvePlayerIdFromCity(cityId);
+    const bonusTotals = await researchService.getPlayerBonusTotals(playerId);
+
+    return res.json({ success: true, bonusTotals });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
 }
 
-// POST /api/research/start
+// POST /research/start
 async function startResearch(req, res) {
   try {
-    const playerId = req.user.id;
-    const { cityId, techCode, targetLevel } = req.body;
+    const { cityId, researchId } = req.body;
 
-    if (!cityId || !techCode || !targetLevel) {
-      return res.status(400).json({ success: false, error: 'Missing cityId, techCode, or targetLevel.' });
+    if (!cityId || !researchId) {
+      return res.status(400).json({ success: false, error: 'Missing cityId or researchId.' });
     }
 
-    const queueItem = await researchService.startResearch(
+    const playerId = await resolvePlayerIdFromCity(cityId);
+
+    const queueItem = await researchService.startResearchNode(
       playerId,
       parseInt(cityId, 10),
-      techCode.toUpperCase(),
-      parseInt(targetLevel, 10)
+      researchId
     );
 
     return res.json({
       success: true,
-      message: `Started research on ${techCode} level ${targetLevel}`,
+      message: `Started research on ${researchId}`,
       queueItem
     });
   } catch (err) {
@@ -97,5 +87,6 @@ async function startResearch(req, res) {
 
 module.exports = {
   getResearchTree,
-  startResearch
+  startResearch,
+  getBonusTotals
 };

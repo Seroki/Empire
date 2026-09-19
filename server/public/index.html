@@ -139,6 +139,31 @@
     background: transparent;
   }
 
+  /* Big Hero / Inn Header Buttons */
+  .hero-inn-row {
+    display: flex;
+    gap: 8px;
+    margin: 12px 0;
+  }
+  .hero-inn-btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--brass);
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    padding: 12px 6px;
+    text-align: center;
+    cursor: pointer;
+    transition: color 0.2s ease, text-shadow 0.2s ease;
+  }
+  .hero-inn-btn:hover {
+    color: var(--parchment);
+    text-shadow: 0 0 6px var(--brass);
+  }
+
   /* Section Headers & Slot Badges */
   .section-header {
     font-family: var(--font-display);
@@ -197,7 +222,6 @@
     background: rgba(107, 143, 90, 0.05);
   }
 
-  /* Compact Locked Slot Variant */
   .building-card.slot-locked {
     flex: 0 0 64px;
     max-width: 64px;
@@ -230,6 +254,30 @@
     color: var(--faded);
     line-height: 1;
     text-align: center;
+  }
+
+  .building-card.researching {
+    border-color: var(--rust);
+    animation: pulse-rust 2.4s ease-in-out infinite;
+  }
+
+  .research-busy-badge {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 9px;
+    color: var(--rust);
+    margin: 2px 0 4px;
+  }
+
+  .research-busy-icon {
+    display: inline-block;
+    animation: spin-icon 1.6s linear infinite;
+  }
+
+  @keyframes spin-icon {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
   }
 
   @keyframes pulse-rust {
@@ -299,7 +347,7 @@
     background: rgba(10,8,5,0.85);
     align-items: center;
     justify-content: center;
-    z-index: 100;
+    z-index: 1000;
     padding: 1rem;
   }
   .modal-overlay.visible { display: flex; }
@@ -312,6 +360,40 @@
     width: 100%;
     text-align: center;
   }
+
+  .game-modal-panel {
+    background: var(--panel);
+    border: 1px solid var(--brass-dim);
+    border-top: 3px solid var(--brass);
+    padding: 1rem;
+    max-width: 650px;
+    width: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+  }
+  .modal-header h2 {
+    margin: 0;
+    font-family: var(--font-display);
+    color: var(--brass);
+    font-size: 14px;
+  }
+  .close-btn {
+    background: transparent;
+    border: none;
+    color: var(--faded);
+    font-size: 18px;
+    cursor: pointer;
+  }
+  .close-btn:hover { color: var(--rust); }
+
   .modal-title {
     font-family: var(--font-display);
     font-size: 12px;
@@ -331,7 +413,32 @@
   .city-selector-row.active {
     border-left: 2px solid var(--brass);
   }
-  
+
+  /* Status Badges */
+  .badge {
+    padding: 2px 6px;
+    font-size: 9px;
+    border-radius: 2px;
+    font-weight: bold;
+    text-transform: uppercase;
+  }
+  .badge.idle { background: rgba(107, 143, 90, 0.2); color: var(--green); border: 1px solid var(--green); }
+  .badge.marching { background: rgba(200, 155, 60, 0.2); color: var(--brass); border: 1px solid var(--brass); }
+  .badge.defending { background: rgba(168, 70, 46, 0.2); color: var(--rust); border: 1px solid var(--rust); }
+
+  .research-tab-bar { display: flex; gap: 4px; margin: 8px 0 12px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .research-tab-btn { background: none; border: none; color: var(--faded); padding: 8px 12px; cursor: pointer; font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; }
+  .research-tab-btn.active { color: var(--brass); border-bottom: 2px solid var(--brass); font-weight: bold; }
+  .research-tech-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-height: 420px; overflow-y: auto; padding: 4px; }
+  .research-tech-card { background: var(--panel-raised); padding: 10px; border: 1px solid var(--line); }
+  .research-tech-card.locked { opacity: 0.55; }
+  .research-tech-card h3 { margin: 0 0 4px; font-size: 13px; color: var(--parchment); }
+  .research-tech-card p { margin: 0 0 6px; font-size: 10px; color: var(--faded); }
+  .research-cost-list { font-size: 9px; color: var(--brass-dim); margin: 6px 0; }
+  .research-btn { background: var(--brass); color: var(--ink); border: none; padding: 6px 10px; font-weight: bold; cursor: pointer; width: 100%; font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; }
+  .research-btn:hover { background: var(--parchment); }
+  .research-btn:disabled { opacity: 0.5; cursor: default; }
+
   @media (max-width: 900px) {
     .layout { grid-template-columns: 1fr; }
     .topbar, .city, .rightpanel, .bottombar { grid-column: 1 / span 1; }
@@ -339,6 +446,8 @@
 </style>
 </head>
 <body>
+
+<div id="build-version-badge" style="position: fixed; bottom: 4px; right: 6px; font-size: 9px; color: var(--faded); opacity: 0.55; font-family: var(--font-mono); z-index: 9999; pointer-events: none;">v2026.08.10-fix1</div>
 
 <div class="layout">
 
@@ -354,40 +463,38 @@
         <td>Honor</td>
         <td id="ticker"></td>
       </tr>
-     <tr>
-  <td style="text-align: center;"><button class="action-btn" onclick="handleSystemAction('avatar_click')">IMG</button></td>
-  <td id="top-player-username">Loading...</td>
-  <td id="top-player-title">--</td>
-  <td id="top-player-prestige">0</td>
-  <td id="top-player-honor">0</td>
-  <td colspan="5" style="padding: 0;">
-    <table style="margin: 0; border: none; width: 100%;">
-      <!-- DYNAMIC WAREHOUSE SUB-HEADER -->
-      <tr id="warehouse-cap-row">
-        <td colspan="6" style="text-align: center; padding: 4px; border-bottom: 1px solid #4a3b2c; font-size: 0.9em; background-color: rgba(0, 0, 0, 0.2);">
-          <span style="color: #e0d8c3; font-weight: bold; margin-right: 12px;">
-            Warehouse Capacity <span id="wh-capacity">0</span>
-          </span>
-          <span style="color: #2ecc71; font-weight: bold;" id="wh-protected">0</span>
-          <span style="color: #e0d8c3;"> / </span>
-          <span style="color: #e74c3c; font-weight: bold;" id="wh-at-risk">0</span>
+      <tr>
+        <td style="text-align: center;"><button class="action-btn" onclick="handleSystemAction('avatar_click')">IMG</button></td>
+        <td id="top-player-username">Loading...</td>
+        <td id="top-player-title">--</td>
+        <td id="top-player-prestige">0</td>
+        <td id="top-player-honor">0</td>
+        <td colspan="5" style="padding: 0;">
+          <table style="margin: 0; border: none; width: 100%;">
+            <tr id="warehouse-cap-row">
+              <td colspan="6" style="text-align: center; padding: 4px; border-bottom: 1px solid #4a3b2c; font-size: 0.9em; background-color: rgba(0, 0, 0, 0.2);">
+                <span style="color: #e0d8c3; font-weight: bold; margin-right: 12px;">
+                  Warehouse Capacity <span id="wh-capacity">0</span>
+                </span>
+                <span style="color: #2ecc71; font-weight: bold;" id="wh-protected">0</span>
+                <span style="color: #e0d8c3;"> / </span>
+                <span style="color: #e74c3c; font-weight: bold;" id="wh-at-risk">0</span>
+              </td>
+            </tr>
+            <tr id="ticker-row">
+              <td class="ticker-cell"><div class="ticker-label">FOOD</div><div class="ticker-value" id="res-food">0</div><div class="ticker-upkeep" id="food-upkeep" style="font-size: 0.75em; font-weight: bold;"></div></td>
+              <td class="ticker-cell"><div class="ticker-label">WOOD</div><div class="ticker-value" id="res-wood">0</div></td>
+              <td class="ticker-cell"><div class="ticker-label">STONE</div><div class="ticker-value" id="res-stone">0</div></td>
+              <td class="ticker-cell"><div class="ticker-label">IRON</div><div class="ticker-value" id="res-iron">0</div></td>
+              <td class="ticker-cell"><div class="ticker-label">GOLD</div><div class="ticker-value" id="res-gold">0</div></td>
+              <td class="ticker-cell" style="min-width: 150px;">
+                <div class="ticker-label">WORKFORCE & POPULATION</div>
+                <div id="res-population">--</div>
+              </td>
+            </tr>
+          </table>
         </td>
       </tr>
-      <!-- RESOURCE TICKER ROW -->
-      <tr id="ticker-row">
-        <td class="ticker-cell"><div class="ticker-label">FOOD</div><div class="ticker-value" id="res-food">0</div></td>
-        <td class="ticker-cell"><div class="ticker-label">WOOD</div><div class="ticker-value" id="res-wood">0</div></td>
-        <td class="ticker-cell"><div class="ticker-label">STONE</div><div class="ticker-value" id="res-stone">0</div></td>
-        <td class="ticker-cell"><div class="ticker-label">IRON</div><div class="ticker-value" id="res-iron">0</div></td>
-        <td class="ticker-cell"><div class="ticker-label">GOLD</div><div class="ticker-value" id="res-gold">0</div></td>
-        <td class="ticker-cell" style="min-width: 150px;">
-          <div class="ticker-label">WORKFORCE & POPULATION</div>
-          <div id="res-population">--</div>
-        </td>
-      </tr>
-    </table>
-  </td>
-</tr>
     </table>
   </div>
 
@@ -399,29 +506,22 @@
           City View — <span id="city-name">Loading...</span>
           <button class="btn-edit-inline" onclick="editCityName()">Edit</button>
           <span id="city-meta" style="font-weight: normal; font-family: var(--font-mono); font-size: 10px; color: var(--faded); margin-left: 8px;"></span>
+          <div id="city-mayor-info" style="font-weight: normal; font-family: var(--font-mono); font-size: 10px; color: var(--faded); margin-top: 3px;">Mayor: —</div>
         </th>
       </tr>
       <tr>
         <td colspan="2">
-          <!-- TOP SECTION: Town Hall & Inner Buildings -->
           <div class="section-header">
             <span>Town Hall & Inner City Buildings</span>
             <span class="slot-badge" id="inner-slot-badge">Built: <strong>0</strong> | Unlocked: <strong class="open">0</strong> / <strong>32</strong></span>
           </div>
           <div class="buildings-grid" id="inner-city-buildings"></div>
 
-          <!-- MIDDLE SECTION: Outer Resource Fields -->
           <div class="section-header">
             <span>Outer Resource Fields (Wilderness Plots)</span>
             <span class="slot-badge" id="outer-slot-badge">Built: <strong>0</strong> | Unlocked: <strong class="open">0</strong> / <strong>40</strong></span>
           </div>
           <div class="buildings-grid" id="outer-resource-fields"></div>
-
-          <!-- BOTTOM SECTION: Available to Construct -->
-          <div class="section-header">
-            <span>Available to Construct</span>
-          </div>
-          <div class="buildings-grid" id="available-to-be-built"></div>
         </td>
       </tr>
     </table>
@@ -429,8 +529,6 @@
 
   <!-- RIGHT PANEL -->
   <div class="rightpanel">
-
-    <!-- Player Profile -->
     <table>
       <tr><th colspan="2">Player Profile</th></tr>
       <tr>
@@ -446,7 +544,6 @@
       <tr><td>Alliance</td><td id="profile-player-alliance">None</td></tr>
     </table>
 
-    <!-- City Stats -->
     <table>
       <tr><th colspan="2">City Stats</th></tr>
       <tr>
@@ -459,10 +556,17 @@
         </td>
       </tr>
       <tr><td>Loyalty</td><td id="city-loyalty">100</td></tr>
+      <tr><td>Happiness</td><td id="city-happiness">100</td></tr>
       <tr><td>Grievance</td><td id="city-grievance">0</td></tr>
+      <tr><td>Levy Pool</td><td id="city-levy-pool">0 / 0</td></tr>
+      <tr>
+        <td>Call to Arms</td>
+        <td>
+          <button class="action-btn" id="call-to-arms-btn" style="width: auto;" onclick="toggleCallToArms()">Loading...</button>
+        </td>
+      </tr>
     </table>
 
-    <!-- City Selector -->
     <table>
       <tr><th colspan="2">City Selector</th></tr>
       <tr class="city-selector-row active" onclick="switchCity(1)"><td>City 1</td><td style="color: var(--green);">[Active]</td></tr>
@@ -472,7 +576,11 @@
       <tr class="city-selector-row" onclick="switchCity(5)"><td>City 5</td><td>[Select]</td></tr>
     </table>
 
-    <!-- Timers & Construction Orders -->
+    <div class="hero-inn-row">
+      <button class="hero-inn-btn" onclick="openFeastingHallGui(currentCityId)">Feasting Hall</button>
+      <button class="hero-inn-btn" onclick="openInnGui(currentCityId)">INN</button>
+    </div>
+
     <table>
       <tr><th>Construction Queues & Timers</th></tr>
       <tr>
@@ -482,16 +590,28 @@
       </tr>
     </table>
 
+    <table>
+      <tr><th>Barracks and Research Queues & Timers</th></tr>
+      <tr>
+        <td>
+          <div class="hero-inn-row" style="margin: 4px 0;">
+            <button class="action-btn" onclick="openBarracksGui(currentCityId)">🏰 Barracks</button>
+            <button class="action-btn" onclick="openResearchGui(currentCityId)">🔬 Research</button>
+          </div>
+        </td>
+      </tr>
+    </table>
   </div>
 
   <!-- BOTTOM BAR -->
   <div class="bottombar">
     <table>
-      <tr><th colspan="10">Bottom Action Bar</th></tr>
+      <tr><th colspan="11">Bottom Action Bar</th></tr>
       <tr>
-        <td>City</td>
+        <td>City Wall</td>
         <td>Map</td>
         <td>Army</td>
+        <td>Hospital</td>
         <td>Quest</td>
         <td>Reports</td>
         <td>Mail</td>
@@ -501,9 +621,10 @@
         <td>Help</td>
       </tr>
       <tr>
-        <td><button class="action-btn" onclick="handleBottomNav('city')">City</button></td>
+        <td><button class="action-btn" onclick="handleBottomNav('wall')">City Wall</button></td>
         <td><button class="action-btn" onclick="handleBottomNav('map')">Map</button></td>
         <td><button class="action-btn" onclick="handleBottomNav('army')">Army</button></td>
+        <td><button class="action-btn" onclick="handleBottomNav('hospital')">Hospital</button></td>
         <td><button class="action-btn" onclick="handleBottomNav('quest')">Quest</button></td>
         <td><button class="action-btn" onclick="handleBottomNav('reports')">Reports</button></td>
         <td><button class="action-btn" onclick="handleBottomNav('mail')">Mail</button></td>
@@ -526,16 +647,109 @@
   </div>
 </div>
 
+<!-- BARRACKS MODAL CONTAINER -->
+<div class="modal-overlay" id="barracks-modal" onclick="closeBarracksGui(event)">
+  <div class="game-modal-panel" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2>🏰 Barracks Training Ground</h2>
+      <button class="close-btn" onclick="closeBarracksGui()">&times;</button>
+    </div>
+    <div id="barracks-content">
+      <p style="font-size: 11px; color: var(--faded);">Loading Barracks Data...</p>
+    </div>
+  </div>
+</div>
+
+<!-- RESEARCH MODAL CONTAINER -->
+<div class="modal-overlay" id="research-modal" onclick="closeResearchGui(event)">
+  <div class="game-modal-panel" onclick="event.stopPropagation()" style="width: 820px; max-width: 95vw; display: flex; flex-direction: column; overflow: hidden;">
+    <div class="modal-header">
+      <h2>🔬 Academy Research Lab</h2>
+      <button class="close-btn" onclick="closeResearchGui()">&times;</button>
+    </div>
+
+    <!-- Frozen header: current resources + discipline/branch tabs never scroll away -->
+    <div style="flex-shrink: 0;">
+      <div id="research-resources-bar" style="display:flex; gap:14px; flex-wrap:wrap; background: var(--panel-raised); border: 1px solid var(--line); padding: 6px 10px; margin: 8px 0 0; font-size: 11px;">
+        <span>🌾 <span id="res-bar-food">0</span></span>
+        <span>🪵 <span id="res-bar-wood">0</span></span>
+        <span>🪨 <span id="res-bar-stone">0</span></span>
+        <span>⛏️ <span id="res-bar-iron">0</span></span>
+        <span>🪙 <span id="res-bar-gold">0</span></span>
+      </div>
+
+      <div class="research-tab-bar" id="research-discipline-tabs">
+        <button class="research-tab-btn active" onclick="switchDiscipline('resource', this)">Resource</button>
+        <button class="research-tab-btn" onclick="switchDiscipline('military', this)">Military</button>
+        <button class="research-tab-btn" onclick="switchDiscipline('knowledge', this)">Knowledge/Intel</button>
+        <button class="research-tab-btn" onclick="switchDiscipline('development', this)">Development</button>
+        <button class="research-tab-btn" onclick="switchDiscipline('diplomacy', this)">Diplomacy</button>
+      </div>
+
+      <div id="research-branch-tabs" style="display:flex; gap:6px; margin: 6px 0 10px; flex-wrap: wrap;"></div>
+    </div>
+
+    <!-- Only this area scrolls -->
+    <div id="research-content" style="flex: 1; overflow-y: auto; min-height: 0;">
+      <p style="font-size: 11px; color: var(--faded); padding: 12px;">Loading Technology Trees...</p>
+    </div>
+  </div>
+</div>
+
+<!-- FEASTING HALL MODAL -->
+<div class="modal-overlay" id="feasting-hall-modal" onclick="closeFeastingHallGui(event)">
+  <div class="game-modal-panel" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2>🏆 Feasting Hall — City Heroes</h2>
+      <button class="close-btn" onclick="closeFeastingHallGui()">&times;</button>
+    </div>
+    <div id="feasting-hall-content">
+      <p style="font-size: 11px; color: var(--faded); padding: 12px;">Loading Officers and Commanders...</p>
+    </div>
+  </div>
+</div>
+
+<!-- INN MODAL CONTAINER -->
+<div class="modal-overlay" id="inn-modal" onclick="closeInnGui(event)">
+  <div class="game-modal-panel" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2>🍺 The Inn — Recruit Candidates</h2>
+      <button class="close-btn" onclick="closeInnGui()">&times;</button>
+    </div>
+    <div id="inn-content">
+      <p style="font-size: 11px; color: var(--faded); padding: 12px;">Seeking wanderers...</p>
+    </div>
+  </div>
+</div>
+
 <script>
-let currentCityId = 1;
+let currentCityId = Number(new URLSearchParams(window.location.search).get('cityId'));
+currentCityId = currentCityId || Number(localStorage.getItem('currentCityId'));
+if (!currentCityId) {
+    // Fallback: try to get the primary city from playerId
+    const playerId = Number(localStorage.getItem('playerId'));
+    if (playerId) {
+        currentCityId = playerId; // Assume player ID == city ID for simplicity
+    } else {
+        // Last resort: get first city from API
+        fetch('/players/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: localStorage.getItem('username'), password: '' })
+        }).then(r => r.json()).then(data => {
+            currentCityId = data.cities && data.cities[0] ? data.cities[0].id : 1;
+        });
+    }
+}
+let activeResearch = null;
 const RESOURCE_KEYS = ["food", "wood", "stone", "iron", "gold"];
-const API_BASE = ""; // relative — works from any device that can reach this server, not just localhost
+const API_BASE = "";
 
 let taxInputTouched = false;
 let currentPlayerId = 1;
 let currentGameState = { queueBusy: false, currentResources: {} };
+let lastSlotAvailability = null;
 
-// SVG Iso Lock Padlock
 const LOCK_ICON_SVG = `
   <svg class="lock-icon" viewBox="0 0 24 24">
     <path d="M12 2C9.24 2 7 4.24 7 7v3H6c-1.1 0-2 .9-2 2v9c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-9c0-1.1-.9-2-2-2h-1V7c0-2.76-2.24-5-5-5zm-3 5c0-1.66 1.34-3 3-3s3 1.34 3 3v3H9V7zm3 8c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2z"/>
@@ -543,7 +757,7 @@ const LOCK_ICON_SVG = `
 `;
 
 function formatNumber(n) {
-  return Number(n || 0).toLocaleString("en-US");
+  return Math.floor(Number(n || 0)).toLocaleString("en-US");
 }
 
 function formatDuration(ms) {
@@ -566,11 +780,834 @@ function hideErrorModal() {
   document.getElementById("modal-overlay").classList.remove("visible");
 }
 
-/* UI Action Hooks */
-function handleBottomNav(action) {
-  showErrorModal(`Navigation module '${action.toUpperCase()}' action hook registered. Awaiting interface linking.`, "Module Hooked");
+/* Modal Open / Close Triggers */
+let activeBarracksId = null;
+
+function renderPrerequisites(prerequisites) {
+  if (!prerequisites || prerequisites.length === 0) {
+    return `<span style="color: var(--faded); font-size: 9px;">None</span>`;
+  }
+
+  return prerequisites.map(p => `
+    <span style="color: ${p.met ? 'var(--green)' : 'var(--rust)'}; font-size: 9px; margin-right: 6px; display: inline-block;">
+      ${p.met ? '✓' : '✗'} ${p.name}
+    </span>
+  `).join('');
 }
 
+async function openBarracksGui(cityId = currentCityId, targetBarracksId = null) {
+  const modal = document.getElementById("barracks-modal");
+  const content = document.getElementById("barracks-content");
+  if (!modal || !content) return;
+
+  modal.classList.add("visible");
+
+  if (!targetBarracksId) {
+    content.innerHTML = `<p style="font-size: 11px; color: var(--faded); padding: 12px;">Locating Barracks structures in City ${cityId}...</p>`;
+  }
+
+  try {
+    const url = targetBarracksId
+      ? `${API_BASE}/units/barracks?cityId=${cityId}&barracksId=${targetBarracksId}`
+      : `${API_BASE}/units/barracks?cityId=${cityId}`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (res.ok && data.success) {
+      const barracksList = data.barracks || [];
+
+      if (barracksList.length === 0) {
+        content.innerHTML = `<div class="empty-note" style="padding: 12px;">No Barracks constructed in this city yet. Build one from the Inner City plots!</div>`;
+        return;
+      }
+
+      activeBarracksId = targetBarracksId || barracksList[0].id;
+      const availablePop = Number(data.availablePopulation || 0);
+      const trainableUnits = data.trainableUnits || [];
+      const lockedUnits = data.lockedUnits || [];
+      const queueList = data.queue || [];
+
+      let html = `
+        <div style="display: flex; gap: 4px; margin-bottom: 8px; border-bottom: 1px solid var(--line); flex-wrap: wrap;">
+          ${barracksList.map(b => `
+            <button class="research-branch-btn" onclick="openBarracksGui(${cityId}, ${b.id})"
+              style="background: ${b.id == activeBarracksId ? 'var(--panel-raised)' : 'transparent'}; border: 1px solid var(--line); border-bottom: 2px solid ${b.id == activeBarracksId ? 'var(--brass)' : 'transparent'}; color: ${b.id == activeBarracksId ? 'var(--brass)' : 'var(--faded)'}; padding: 6px 12px; font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; cursor: pointer;">
+              ${b.name || 'Barracks'} <span style="color: var(--faded);">Lv ${b.level}</span> #${b.id}
+            </button>
+          `).join('')}
+        </div>
+        <div style="text-align: right; font-size: 11px; margin-bottom: 8px;">
+          <span style="color: var(--faded);">Available Levy:</span>
+          <strong style="color: ${availablePop > 0 ? 'var(--green)' : 'var(--rust)'};">${formatNumber(availablePop)}</strong>
+        </div>
+      `;
+
+      function unitRow(u, unlocked) {
+        const popCostPerUnit = Math.max(1, Number(u.population_cost || u.pop_cost || 1));
+        const maxTrainableByPop = Number(u.maxTrainable ?? Math.floor(availablePop / popCostPerUnit));
+
+        return `
+          <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); ${!unlocked ? 'opacity: 0.55;' : ''}">
+            <td style="padding: 6px;">
+              <strong style="color: var(--parchment);">${u.name}</strong>
+              <div style="font-size: 9px; color: var(--faded);">
+                ${unlocked ? `👥 Pop: ${popCostPerUnit}` : `<span style="color:var(--rust);">${u.reason || `Req. Barracks Lv ${u.required_barracks_level || 1}`}</span>`}
+              </div>
+            </td>
+            <td style="padding: 6px; font-size: 10px; color: var(--faded);">
+              <div>⚔️ ${u.attack || 0} | 🛡️ ${u.defense || 0}</div>
+              <div style="font-size: 9px; color: var(--brass-dim); margin-top: 2px;">
+                🌾 ${formatNumber(u.food_cost || 0)} | 🪵 ${formatNumber(u.wood_cost || 0)} | 🪨 ${formatNumber(u.stone_cost || 0)} | ⛏️ ${formatNumber(u.iron_cost || 0)} | 🪙 ${formatNumber(u.gold_cost || 0)}
+              </div>
+            </td>
+            <td style="padding: 6px; font-size: 11px; font-weight: 600; text-align: center;">
+              ${formatNumber(u.owned || 0)}
+            </td>
+            <td style="padding: 6px;">
+              ${unlocked ? `
+                <div style="display: flex; flex-direction: column; gap: 2px;">
+                  <div style="display: flex; gap: 4px; align-items: center;">
+                    <input type="number" 
+                           id="train-qty-${u.code || u.id}" 
+                           min="1" 
+                           value="1" 
+                           style="width: 50px; background: var(--ink); border: 1px solid var(--line); color: var(--parchment); font-family: var(--font-mono); font-size: 10px; text-align: center; padding: 2px;">
+                    <button class="btn-edit-inline" style="padding: 2px 4px; font-size: 9px;" onclick="document.getElementById('train-qty-${u.code || u.id}').value = ${maxTrainableByPop}">Max</button>
+                    <button class="action-btn" style="padding: 2px 8px; font-size: 9px;" onclick="submitTrainOrder('${u.code || u.id}')">
+                      Train
+                    </button>
+                  </div>
+                  <div style="font-size: 8px; color: var(--faded);">Max: <span style="color: var(--brass);">${formatNumber(maxTrainableByPop)}</span></div>
+                </div>
+              ` : `
+                <span style="font-size: 9px; color: var(--rust);">🔒 Locked</span>
+              `}
+            </td>
+          </tr>
+        `;
+      }
+
+      function unitTable(units, unlocked) {
+        return `
+          <table style="width:100%; border-collapse: collapse;">
+            <thead>
+              <tr style="border-bottom: 1px solid var(--line); text-align: left;">
+                <th style="padding: 6px;">UNIT</th>
+                <th style="padding: 6px;">STATS & COSTS</th>
+                <th style="padding: 6px; text-align: center;">OWNED</th>
+                <th style="padding: 6px;">RECRUIT ORDER</th>
+              </tr>
+            </thead>
+            <tbody>${units.map(u => unitRow(u, unlocked)).join('')}</tbody>
+          </table>
+        `;
+      }
+
+      if (trainableUnits.length > 0) {
+        html += `
+          <div style="font-size: 10px; color: var(--green); text-transform: uppercase; letter-spacing: 0.08em; margin: 4px 0 4px;">
+            Trainable at this Barracks (Lv ${barracksList.find(b => b.id == activeBarracksId)?.level ?? '?'})
+          </div>
+          ${unitTable(trainableUnits, true)}
+        `;
+      } else {
+        html += `<div class="empty-note" style="padding: 12px;">No units trainable at this Barracks yet — upgrade it or research the required tech.</div>`;
+      }
+
+      if (lockedUnits.length > 0) {
+        html += `
+          <div style="font-size: 10px; color: var(--rust); text-transform: uppercase; letter-spacing: 0.08em; margin: 14px 0 4px; padding-top: 10px; border-top: 1px dashed var(--line);">
+            Locked — Requirements Not Yet Met
+          </div>
+          ${unitTable(lockedUnits, false)}
+        `;
+      }
+
+      if (queueList.length > 0) {
+        html += `
+          <div style="margin-top: 12px; border-top: 1px solid var(--line); padding-top: 8px;">
+            <h4 style="font-size: 11px; color: var(--brass); margin: 0 0 6px 0; text-transform: uppercase;">Active Recruitment Queue</h4>
+            <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
+              <thead>
+                <tr style="text-align: left; color: var(--faded); border-bottom: 1px solid rgba(255,255,255,0.05);">
+                  <th style="padding: 4px 8px;">Unit</th>
+                  <th style="padding: 4px 8px;">Qty</th>
+                  <th style="padding: 4px 8px;">Completes At</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${queueList.map(q => `
+                  <tr style="border-bottom: 1px solid rgba(255,255,255,0.02);">
+                    <td style="padding: 4px 8px; color: var(--parchment);">${q.name}</td>
+                    <td style="padding: 4px 8px; font-weight: 600;">${formatNumber(q.quantity)}</td>
+                    <td style="padding: 4px 8px; color: var(--brass-dim);">${new Date(q.finish_at).toLocaleTimeString()}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+
+      content.innerHTML = html;
+    } else {
+      content.innerHTML = `<div style="color: var(--rust); padding: 12px;">${data.error || "Failed to load Barracks."}</div>`;
+    }
+  } catch (err) {
+    console.error("Barracks GUI Error:", err);
+    content.innerHTML = `<div style="color: var(--rust); padding: 12px;">Could not connect to game server.</div>`;
+  }
+}
+
+async function submitTrainOrder(unitCode) {
+  const qtyInput = document.getElementById(`train-qty-${unitCode}`);
+  const quantity = Math.max(1, Number(qtyInput?.value || 1));
+
+  if (!activeBarracksId) {
+    showErrorModal("No Barracks selected.");
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/units/train`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        cityId: currentCityId,
+        barracksId: activeBarracksId,
+        unitCode: unitCode,
+        quantity: quantity
+      })
+    });
+    const result = await res.json();
+    if (res.ok && result.success) {
+      openBarracksGui(currentCityId, activeBarracksId);
+      refresh();
+    } else {
+      showErrorModal(result.error || result.message || "Failed to initiate training.");
+    }
+  } catch (err) {
+    showErrorModal("Could not connect to game server to issue training order.");
+  }
+}
+
+function closeBarracksGui(event) {
+  if (event && event.target !== event.currentTarget) return;
+  const modal = document.getElementById("barracks-modal");
+  if (modal) modal.classList.remove("visible");
+}
+
+let researchData = null; // { academyLevel, activeQueue, tree }
+let currentDiscipline = 'resource';
+let currentBranchCode = null;
+
+async function openResearchGui(cityId = currentCityId) {
+  const modal = document.getElementById("research-modal");
+  const content = document.getElementById("research-content");
+
+  modal.classList.add("visible");
+  content.innerHTML = `<p style="font-size:11px; color:var(--faded); padding:12px">Loading Technology Trees...</p>`;
+
+  try {
+    const res = await fetch(`${API_BASE}/research?cityId=${cityId}`);
+    const data = await res.json();
+
+    const cityData = await fetchJsonSafe(`${API_BASE}/cities/${cityId}`);
+    updateResearchResourceBar(cityData?.resources);
+
+    if (res.ok && data.success) {
+      researchData = data;
+
+      content.innerHTML = `<div id="research-ladder"></div>`;
+      renderBranchTabs();
+    } else {
+      content.innerHTML = `<div style="color:var(--rust); padding:12px">${data.error || "Failed to load research tree."}</div>`;
+    }
+  } catch (err) {
+    console.error("Research GUI Error", err);
+    content.innerHTML = `<div style="color:var(--rust); padding:12px">Could not connect to game server.</div>`;
+  }
+}
+// Inside your node iteration loop (e.g., inside openResearchGui or renderResearchTree):
+
+function updateResearchResourceBar(resources) {
+  if (!resources) return;
+  document.getElementById("res-bar-food").textContent = formatNumber(resources.food);
+  document.getElementById("res-bar-wood").textContent = formatNumber(resources.wood);
+  document.getElementById("res-bar-stone").textContent = formatNumber(resources.stone);
+  document.getElementById("res-bar-iron").textContent = formatNumber(resources.iron);
+  document.getElementById("res-bar-gold").textContent = formatNumber(resources.gold);
+}
+
+function closeResearchGui(event) {
+  if (event && event.target !== event.currentTarget) return;
+  document.getElementById("research-modal").classList.remove("visible");
+}
+
+function switchDiscipline(discipline, btnEl) {
+  currentDiscipline = discipline;
+  currentBranchCode = null; // reset — renderBranchTabs will pick this discipline's first branch
+  document.querySelectorAll('#research-discipline-tabs .research-tab-btn').forEach(btn => btn.classList.remove('active'));
+  if (btnEl) btnEl.classList.add('active');
+  renderBranchTabs();
+}
+
+/* Each discipline has several branches (e.g. Military: Troop, Military
+   Science, Military Tradition, Iron Working, Archery, Horseback Riding,
+   Engineering, Machinery). This renders that second row of sub-tabs. */
+function renderBranchTabs() {
+  const branchBar = document.getElementById('research-branch-tabs');
+  if (!branchBar || !researchData || !researchData.tree) return;
+
+  const branches = researchData.tree[currentDiscipline] || {};
+  const branchCodes = Object.keys(branches);
+
+  if (!currentBranchCode || !branches[currentBranchCode]) {
+    currentBranchCode = branchCodes[0] || null;
+  }
+
+  branchBar.innerHTML = branchCodes.map(code => `
+    <button class="research-branch-btn" onclick="switchBranch('${code}', this)"
+      style="background: ${code === currentBranchCode ? 'var(--panel-raised)' : 'transparent'}; border: 1px solid var(--line); color: ${code === currentBranchCode ? 'var(--brass)' : 'var(--faded)'}; padding: 4px 10px; font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; cursor: pointer;">
+      ${branches[code].branchName}
+    </button>
+  `).join('');
+
+  renderLadder();
+}
+
+function switchBranch(branchCode, btnEl) {
+  currentBranchCode = branchCode;
+  renderBranchTabs(); // cheap re-render keeps active-tab styling in sync
+}
+
+/* Renders the selected branch as a vertical ladder: one row per level,
+   holding that level's step cards, followed by an "Additional Research"
+   section for any old-system fill-in content nested under this branch. */
+function formatResearchBonusLabel(bonusType) {
+  if (!bonusType) return "Research Bonus";
+  return String(bonusType)
+    .toLowerCase()
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function formatResearchPercent(value) {
+  const amount = Number(value || 0);
+
+  if (!Number.isFinite(amount) || amount === 0) return null;
+
+  const display = Number.isInteger(amount)
+    ? amount
+    : amount.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+
+  return `${amount > 0 ? "+" : ""}${display}%`;
+}
+
+function getBranchBonusSummary(branch) {
+  const nodes = [
+    ...(Array.isArray(branch?.nodes) ? branch.nodes : []),
+    ...(Array.isArray(branch?.fillIns) ? branch.fillIns : [])
+  ];
+
+  const bonusTypes = [...new Set(
+    nodes
+      .map(node => node.bonusType)
+      .filter(Boolean)
+  )];
+
+  return bonusTypes
+    .map(bonusType => {
+      const total = Number(researchData?.bonusTotals?.[bonusType] || 0);
+
+      return {
+        bonusType,
+        label: formatResearchBonusLabel(bonusType),
+        total
+      };
+    })
+    .filter(item => Number.isFinite(item.total));
+}   
+function renderLadder() {
+  const container = document.getElementById("research-ladder");
+
+  if (!container || !researchData || !researchData.tree) return;
+
+  const branch = researchData.tree[currentDiscipline]?.[currentBranchCode];
+
+  if (!branch) {
+    container.innerHTML = `
+      <div class="empty-note" style="padding:12px">
+        No branches available in this discipline yet.
+      </div>
+    `;
+    return;
+  }
+
+  const byLevel = {};
+
+  (branch.nodes || []).forEach(node => {
+    if (!byLevel[node.level]) byLevel[node.level] = [];
+    byLevel[node.level].push(node);
+  });
+
+  const levels = Object.keys(byLevel)
+    .map(Number)
+    .sort((a, b) => a - b);
+
+  const bonusSummary = getBranchBonusSummary(branch);
+
+  const totalsHTML = bonusSummary.length
+    ? `
+      <div style="
+        display:flex;
+        flex-wrap:wrap;
+        gap:6px;
+        margin:0 0 12px;
+        padding:8px 10px;
+        border:1px solid var(--brass-dim);
+        background:rgba(200,155,60,0.06);
+      ">
+        ${bonusSummary.map(item => `
+          <div style="
+            font-size:10px;
+            color:var(--faded);
+            padding-right:8px;
+            border-right:1px solid var(--line);
+          ">
+            ${item.label}:
+            <strong style="color:var(--green)">
+              ${formatResearchPercent(item.total) || "0%"}
+            </strong>
+          </div>
+        `).join("")}
+      </div>
+    `
+    : "";
+
+  let html = totalsHTML;
+
+  html += levels.map(level => {
+    const steps = byLevel[level].sort(
+      (a, b) => Number(a.step || 0) - Number(b.step || 0)
+    );
+
+    const stepsHTML = steps.map(node => makeResearchNodeCard(node)).join("");
+
+    return `
+      <div class="research-level-row" style="margin-bottom:10px">
+        <div style="
+          font-size:10px;
+          color:var(--brass-dim);
+          text-transform:uppercase;
+          margin-bottom:4px;
+        ">
+          Level ${level}
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap">
+          ${stepsHTML}
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  if (branch.fillIns && branch.fillIns.length > 0) {
+    const fillInHTML = branch.fillIns
+      .map(node => makeResearchNodeCard(node))
+      .join("");
+
+    html += `
+      <div class="research-fillins" style="
+        margin-top:16px;
+        padding-top:10px;
+        border-top:1px dashed var(--line);
+      ">
+        <div style="
+          font-size:10px;
+          color:var(--faded);
+          text-transform:uppercase;
+          margin-bottom:6px;
+        ">
+          Additional Research
+          <span style="color:var(--faded); text-transform:none">
+            (optional bonuses)
+          </span>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap">
+          ${fillInHTML}
+        </div>
+      </div>
+    `;
+  }
+
+  container.innerHTML = html;
+}
+
+function makeResearchNodeCard(node) {
+  const state = node.completed
+    ? "completed"
+    : node.isCurrentlyResearching
+      ? "active"
+      : node.unlocked
+        ? "open"
+        : "locked";
+
+  const borderColor = state === "completed"
+    ? "var(--green)"
+    : state === "active"
+      ? "var(--brass)"
+      : "var(--line)";
+
+  const opacity = state === "locked" ? 0.45 : 1;
+
+  const costText = !node.completed && node.unlocked
+    ? `
+      <div style="font-size:8px; color:var(--faded); margin-top:4px">
+        ${formatNumber(node.cost?.food || 0)} food ·
+        ${formatNumber(node.cost?.wood || 0)} wood ·
+        ${formatNumber(node.cost?.stone || 0)} stone ·
+        ${formatNumber(node.cost?.iron || 0)} iron ·
+        ${formatNumber(node.cost?.gold || 0)} gold
+      </div>
+    `
+    : "";
+
+  const typeLabel = node.isGateway
+    ? `<span style="color:var(--brass)">⛩ Gateway</span>`
+    : node.effectType === "Unlock"
+      ? `<span style="color:var(--green)">Unlock</span>`
+      : `<span style="color:var(--faded)">Bonus</span>`;
+
+  const bonusLabel = formatResearchBonusLabel(node.bonusType);
+  const bonusValue = formatResearchPercent(node.bonusPct);
+
+  const bonusText = bonusValue
+    ? `
+      <div style="
+        font-size:9px;
+        color:${node.isGateway ? "var(--brass)" : "var(--green)"};
+        margin-top:3px;
+        font-weight:600;
+      ">
+        ${node.isGateway ? "⛩ Gateway — " : "✦ "}
+        ${bonusValue} ${bonusLabel}
+      </div>
+    `
+    : "";
+
+  const benefitText = node.benefitText
+    ? `
+      <div style="font-size:9px; color:var(--faded); margin-top:2px">
+        ${typeLabel} — ${node.benefitText}
+      </div>
+    `
+    : `
+      <div style="font-size:9px; color:var(--faded); margin-top:2px">
+        ${typeLabel}
+      </div>
+    `;
+
+  let buttonHTML;
+
+  if (node.completed) {
+    buttonHTML = `
+      <button
+        class="action-btn"
+        disabled
+        style="border-color:var(--green); color:var(--green); width:100%; margin-top:6px"
+      >
+        Researched
+      </button>
+    `;
+  } else if (node.isCurrentlyResearching) {
+    buttonHTML = `
+      <button
+        class="action-btn"
+        disabled
+        style="width:100%; margin-top:6px"
+      >
+        Researching
+      </button>
+    `;
+  } else if (node.unlocked) {
+    buttonHTML = `
+      <button
+        class="action-btn"
+        onclick="attemptResearch(${Number(node.researchId)})"
+        style="width:100%; margin-top:6px"
+      >
+        Research
+      </button>
+    `;
+  } else {
+    buttonHTML = `
+      <button
+        class="action-btn"
+        disabled
+        style="width:100%; margin-top:6px"
+      >
+        Locked
+      </button>
+    `;
+  }
+
+  return `
+    <div
+      class="building-card"
+      style="
+        min-width:150px;
+        max-width:170px;
+        border-color:${borderColor};
+        opacity:${opacity};
+      "
+      title="${node.name || "Research"}"
+    >
+      <div class="b-name" style="font-size:11px">
+        ${node.name || "Unnamed Research"}
+      </div>
+
+      ${benefitText}
+      ${bonusText}
+      ${costText}
+      ${buttonHTML}
+    </div>
+  `;
+}
+function attemptResearch(researchId) {
+  if (researchData.activeQueue) {
+    showErrorModal(`You are already researching ${researchData.activeQueue.tech_code}. Wait until it finishes.`, 'Research Queue Busy');
+    return;
+  }
+  // Everything else (prerequisite graph, academy level, cost) is validated
+  // server-side, since the real check spans chain + cross-branch + building
+  // requirements that only the backend can evaluate reliably.
+  sendStartResearchRequest(researchId);
+}
+
+async function sendStartResearchRequest(researchId) {
+  try {
+    const res = await fetch(`${API_BASE}/research/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cityId: currentCityId,
+        researchId: researchId
+      })
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      showErrorModal(data.error || 'Research order rejected.', 'Research Failed');
+    } else {
+      openResearchGui(currentCityId);
+      if (typeof refresh === "function") refresh();
+    }
+  } catch (err) {
+    showErrorModal('Failed to communicate with the server.', 'Error');
+  }
+}
+
+/* UPDATED FEASTING HALL & HERO MANAGEMENT */
+async function openFeastingHallGui(cityId = currentCityId) {
+  const modal = document.getElementById("feasting-hall-modal");
+  const content = document.getElementById("feasting-hall-content");
+  if (!modal || !content) return;
+
+  modal.classList.add("visible");
+
+  let heroes = [];
+
+  try {
+    const res = await fetch(`${API_BASE}/cities/${cityId}/heroes`);
+    if (res.ok) {
+      const data = await res.json();
+      // Safely handle both raw array payloads and wrapped objects ({ heroes: [...] })
+      heroes = Array.isArray(data) ? data : (data.heroes || data.data || []);
+    } else {
+      throw new Error(`Server returned status ${res.status}`);
+    }
+  } catch (err) {
+    console.warn("Feasting Hall backend endpoint error:", err);
+    content.innerHTML = `<div style="color: var(--rust); padding: 12px;">Failed to load hero data from server.</div>`;
+    return;
+  }
+
+  if (!Array.isArray(heroes) || heroes.length === 0) {
+    content.innerHTML = `<div class="empty-note" style="padding: 12px;">No heroes currently reside in this city. Visit the Inn to recruit new heroes!</div>`;
+    return;
+  }
+
+  let html = `
+    <table style="width:100%; border-collapse: collapse;">
+      <thead>
+        <tr style="text-align: left;">
+          <th style="padding: 6px;">HERO</th>
+          <th style="padding: 6px;">LVL</th>
+          <th style="padding: 6px;">POL</th>
+          <th style="padding: 6px;">ATK</th>
+          <th style="padding: 6px;">INT</th>
+          <th style="padding: 6px;">STATUS</th>
+          <th style="padding: 6px; text-align: center;">MAYOR</th>
+          <th style="padding: 6px; text-align: center;">RELEASE</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
+
+   heroes.forEach(h => {
+    const isMayor = Boolean(h.is_mayor);
+    const statusClass = (h.status || 'idle').toLowerCase();
+ 
+    html += `
+      <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+        <td style="padding: 6px; font-weight: bold; color: var(--parchment);">${h.name}</td>
+        <td style="padding: 6px; color: var(--brass);">${h.level || 1}</td>
+        <td style="padding: 6px;">${h.politics || 0}</td>
+        <td style="padding: 6px;">${h.attack || 0}</td>
+        <td style="padding: 6px;">${h.intelligence || 0}</td>
+        <td style="padding: 6px;"><span class="badge ${statusClass}">${h.status || 'IDLE'}</span></td>
+        <td style="padding: 6px; text-align: center;">
+          <input type="radio" name="mayorSelect" 
+                 value="${h.id}" 
+                 ${isMayor ? 'checked' : ''} 
+                 onclick="assignMayor(${cityId}, ${h.id})">
+          ${isMayor ? '<div style="font-size: 8px; color: var(--brass); font-weight: bold;">(MAYOR)</div>' : ''}
+        </td>
+        <td style="padding: 6px; text-align: center;">
+          <button class="btn-edit-inline" style="border-color: var(--rust); color: var(--rust);" onclick="confirmReleaseHero(${cityId}, ${h.id}, '${h.name.replace(/'/g, "\\'")}')">
+            Release
+          </button>
+        </td>
+      </tr>
+    `;
+  });
+
+
+  html += `</tbody></table>`;
+  content.innerHTML = html;
+}
+
+function closeFeastingHallGui(event) {
+  if (event && event.target !== event.currentTarget) return;
+  document.getElementById("feasting-hall-modal").classList.remove("visible");
+}
+function confirmReleaseHero(cityId, heroId, heroName) {
+  if (!confirm(`Release ${heroName} from service? They'll be unassigned from this city and can be reassigned later.`)) {
+    return;
+  }
+  releaseHero(cityId, heroId);
+}
+ 
+async function releaseHero(cityId, heroId) {
+  try {
+    const res = await fetch(`${API_BASE}/cities/${cityId}/heroes/${heroId}/release`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" }
+    });
+    const result = await res.json();
+    if (res.ok && result.success !== false) {
+      openFeastingHallGui(cityId);
+      refresh();
+    } else {
+      showErrorModal(result.error || "Failed to release hero.");
+    }
+  } catch (err) {
+    showErrorModal("Could not connect to game server to release hero.");
+  }
+}
+
+async function assignMayor(cityId, heroId) {
+  try {
+    const res = await fetch(`${API_BASE}/cities/${cityId}/mayor`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ heroId })
+    });
+    const result = await res.json();
+    if (res.ok && result.success !== false) {
+      openFeastingHallGui(cityId);
+      refresh();
+    } else {
+      showErrorModal(result.error || "Failed to assign mayor.");
+    }
+  } catch (err) {
+    showErrorModal("Could not connect to game server to assign mayor.");
+  }
+}
+
+/* INN & RECRUITMENT MANAGEMENT */
+async function openInnGui(cityId = currentCityId) {
+  const modal = document.getElementById("inn-modal");
+  const content = document.getElementById("inn-content");
+  
+  if (!modal || !content) return;
+
+  modal.classList.add("visible");
+
+  // Load inn.html directly inside the modal panel
+  content.innerHTML = `
+    <iframe 
+      src="/inn.html?cityId=${cityId}" 
+      style="width: 100%; height: 500px; border: none; background: transparent;">
+    </iframe>
+  `;
+}
+
+function closeInnGui(event) {
+  if (event && event.target !== event.currentTarget) return;
+  const modal = document.getElementById("inn-modal");
+  if (modal) modal.classList.remove("visible");
+}
+
+async function recruitHero(cityId, heroId) {
+  try {
+    const res = await fetch(`${API_BASE}/inn/recruit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cityId, heroId })
+    });
+    const result = await res.json();
+    if (res.ok && result.success !== false) {
+      openInnGui(cityId);
+      refresh();
+    } else {
+      showErrorModal(result.error || "Failed to recruit hero.");
+    }
+  } catch (err) {
+    showErrorModal("Could not connect to game server to recruit hero.");
+  }
+}
+
+/* UI Action Hooks */
+function handleBottomNav(action) {
+  if (action === 'map') {
+    window.open(`map.html?cityId=${currentCityId}`, "empire-map", "width=1200,height=800");
+    return;
+  }
+    if (action === 'wall') {
+    window.open(`wall.html?cityId=${currentCityId}`, "city wall", "width=1200,height=800");
+    return;
+  }
+    if (action === 'shop') {
+    window.open(`market.html?cityId=${currentCityId}`, "empire-market", "width=800,height=800");
+    return;
+  }
+    if (action === 'army') {
+    window.open(`army.html?cityId=${currentCityId}`, "Army", "width=950,height=550");
+    return;
+  }
+  if (action === 'hospital') {
+    window.open(`hospital.html?cityId=${currentCityId}`, "Hospital", "width=950,height=650");
+    return;
+  }
+  if (action === 'quest') {
+    window.open(`quest.html?cityId=${currentCityId}`, "Quests", "width=950,height=550");
+    return;
+  }
+  showErrorModal(`Navigation module '${action.toUpperCase()}' action hook registered. Awaiting interface linking.`, "Module Hooked");
+}
 function handleSystemAction(action) {
   showErrorModal(`System action triggered: '${action}'.`, "System Event");
 }
@@ -666,17 +1703,45 @@ async function submitTaxRate() {
   }
 }
 
+let currentCallToArmsActive = false;
+
+async function toggleCallToArms() {
+  const nextState = !currentCallToArmsActive;
+  const confirmMsg = nextState
+    ? "Activate Call to Arms? This expands your Levy cap and doubles refill speed, but drains Loyalty and Happiness daily until deactivated."
+    : "Deactivate Call to Arms?";
+  if (!confirm(confirmMsg)) return;
+
+  const btn = document.getElementById("call-to-arms-btn");
+  if (btn) btn.disabled = true;
+
+  try {
+    const res = await fetch(`${API_BASE}/cities/${currentCityId}/callToArms`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ active: nextState })
+    });
+    const result = await res.json();
+    if (res.ok && result.success) {
+      refresh();
+    } else {
+      showErrorModal(result.error || "Failed to toggle Call to Arms");
+    }
+  } catch (err) {
+    showErrorModal("Could not reach the server.");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 function populationCellHTML(resources, queue) {
   const totalWorkers = Number(resources.workers || 0);
-  // Reserved workers come from the real construction_queue data —
-  // each queued item carries workers_used, which is the source of
-  // truth (not fields the backend never actually sent).
   const reservedWorkers = (queue || []).reduce(
     (sum, item) => sum + (Number(item.workers_used) || 0),
     0
   );
   const availableWorkers = Math.max(0, totalWorkers - reservedWorkers);
-  const maxCap = Number(resources.cottagesPopulation || resources.basePopulation || resources.population || 0);
+  const maxCap = Number(resources.population || 0);
 
   return `
     <div class="pop-row"><span>Available Workers:</span><strong style="color: var(--green);">${formatNumber(availableWorkers)} / ${formatNumber(totalWorkers)}</strong></div>
@@ -700,7 +1765,6 @@ function updateTicker(resources) {
 
   const popEl = document.getElementById("res-population");
   if (popEl) {
-    // Pass currentGameState.constructionQueue (or currentGameState.queue) into populationCellHTML
     const activeQueue = currentGameState.constructionQueue || currentGameState.queue || [];
     popEl.innerHTML = populationCellHTML(resources, activeQueue);
   }
@@ -709,10 +1773,56 @@ function updateTicker(resources) {
     const taxInput = document.getElementById("tax-rate-input");
     if (taxInput) taxInput.value = resources.tax_rate ?? 30;
   }
+
+  const loyaltyEl = document.getElementById("city-loyalty");
+  if (loyaltyEl && resources.loyalty != null) loyaltyEl.textContent = resources.loyalty;
+
+  const happinessEl = document.getElementById("city-happiness");
+  if (happinessEl && resources.happiness != null) happinessEl.textContent = resources.happiness;
+
+  const grievanceEl = document.getElementById("city-grievance");
+  if (grievanceEl && resources.happiness != null) grievanceEl.textContent = 100 - resources.happiness;
+
+  const levyPoolEl = document.getElementById("city-levy-pool");
+  if (levyPoolEl && resources.levy_pool != null) {
+    levyPoolEl.textContent = `${formatNumber(resources.levy_pool)} / ${formatNumber(resources.levy_cap || 0)}`;
+  }
+
+  const ctaBtn = document.getElementById("call-to-arms-btn");
+  if (ctaBtn && resources.call_to_arms_active != null) {
+    currentCallToArmsActive = resources.call_to_arms_active;
+    if (resources.call_to_arms_active) {
+      ctaBtn.textContent = "Deactivate";
+      ctaBtn.style.borderColor = "var(--rust)";
+      ctaBtn.style.color = "var(--rust)";
+    } else {
+      ctaBtn.textContent = "Activate";
+      ctaBtn.style.borderColor = "var(--line)";
+      ctaBtn.style.color = "var(--parchment)";
+    }
+  }
+
+  const foodUpkeepEl = document.getElementById("food-upkeep");
+  if (foodUpkeepEl && resources.net_food_per_day != null) {
+    const net = Number(resources.net_food_per_day);
+    const consumption = Number(resources.food_consumption_per_day || 0);
+    const isPositive = net >= 0;
+    foodUpkeepEl.style.color = isPositive ? "#2ecc71" : "#e74c3c";
+    foodUpkeepEl.textContent = `Upkeep ${formatNumber(consumption)}/day (${isPositive ? "+" : ""}${formatNumber(net)}/day)`;
+  }
 }
 
-function makeBuildingCard(b, isBusy) {
-  const storage = b.field_storage;
+const PROTECTED_BUILDING_TYPE_IDS = [1, 2, 3]; // Town Hall, Keep, Walls — can never be demolished
+
+function makeBuildingCard(b, isBusy, queueItem) {
+  const hasStorageData = b.slot_pool === 'outer' && b.max_capacity != null;
+  const storage = hasStorageData ? {
+    stored: Number(b.stored_resource || 0),
+    capacity: Number(b.max_capacity || 0),
+    percent: b.max_capacity > 0 ? Math.min(100, (Number(b.stored_resource || 0) / Number(b.max_capacity)) * 100) : 0,
+    full: Number(b.stored_resource || 0) >= Number(b.max_capacity || 0)
+  } : null;
+
   const storageHTML = storage ? `
     <div style="margin: 4px 0;">
       <div style="height: 5px; background: var(--ink); border: 1px solid var(--line); overflow: hidden;">
@@ -725,76 +1835,183 @@ function makeBuildingCard(b, isBusy) {
     </button>
   ` : "";
 
+  const isAcademy = (b.building_name || b.name || "").toUpperCase() === "ACADEMY";
+  const isResearching = isAcademy && !!activeResearch;
+
+  const researchBadgeHTML = isResearching ? `
+    <div class="research-busy-badge" data-finish="${activeResearch.finish_time}">
+      <span class="research-busy-icon">🔬</span>
+      <span data-countdown>--:--:--</span>
+    </div>
+  ` : "";
+
+  // Generalized upgrade/demolition badge — same spinner+countdown pattern
+  // as the Academy research badge above, but driven by this specific
+  // building's own construction_queue entry (matched by building_id),
+  // covering every building rather than just Academy's research state.
+  const isBusyBuilding = !!queueItem;
+  const isDemolishing = !!(queueItem && queueItem.is_demolition);
+
+  const buildBadgeHTML = queueItem ? `
+    <div class="research-busy-badge" data-finish="${queueItem.finish_time}" style="${isDemolishing ? 'color: var(--rust);' : ''}">
+      <span class="research-busy-icon">${isDemolishing ? '💥' : '🔨'}</span>
+      <span data-countdown>--:--:--</span>
+      ${isDemolishing ? `<span style="margin-left:4px;">Demolishing</span>` : `<span style="margin-left:4px;">→ Lv ${queueItem.target_level}</span>`}
+    </div>
+  ` : "";
+
+  const canDemolish = b.level >= 1 && !isBusyBuilding && !isBusy &&
+    !PROTECTED_BUILDING_TYPE_IDS.includes(Number(b.building_type_id));
+
+  const demolishButtonHTML = canDemolish ? `
+    <button class="action-btn" style="border-color: var(--rust); color: var(--rust); margin-top: 4px;" onclick="confirmDemolish(${b.id}, '${(b.building_name || b.name || 'this building').replace(/'/g, "\\'")}', ${b.level})">
+      Demolish
+    </button>
+  ` : "";
+
+  // Bonus indicator (Valley + Research combined) — only meaningful for
+  // outer resource fields, and only shown when there's actually a
+  // nonzero bonus to report.
+  const totalBonusPct = Number(b.total_bonus_pct || 0);
+  const bonusBadgeHTML = (hasStorageData && totalBonusPct > 0) ? `
+    <span class="b-level" style="color: var(--green); margin-left: 4px;" title="Valley +${Number(b.valley_bonus_pct || 0)}% / Research +${Number(b.research_bonus_pct || 0)}% / Mayor +${Number(b.mayor_bonus_pct || 0)}%">
+      🌾+${totalBonusPct}%
+    </span>
+  ` : "";
+
   return `
-    <div class="building-card ${b.level === 0 ? "under-construction" : ""}">
+    <div class="building-card ${b.level === 0 ? "under-construction" : ""} ${isResearching || isDemolishing ? "researching" : ""}">
       <div>
-        <div class="b-name">${b.building_name}</div>
+        <div class="b-name">${b.building_name || b.name || "Building"}</div>
         <div class="b-meta">
-          <span>${b.level === 0 ? "" : `<span class="b-level">Lv ${b.level}</span>`}</span>
+          <span>${b.level === 0 ? "" : `<span class="b-level">Lv ${b.level || 1}</span>${bonusBadgeHTML}`}</span>
           <span class="b-tag ${b.level === 0 ? "building" : ""}">${b.level === 0 ? "Building" : (b.slot_pool || "fixed")}</span>
         </div>
+        ${researchBadgeHTML}
+        ${buildBadgeHTML}
         ${storageHTML}
       </div>
-      <button class="action-btn" ${b.level === 0 || isBusy ? "disabled" : ""} onclick="startBuildingAction('upgrade', ${b.id})">
-        ${b.level === 0 ? "In Progress" : "Upgrade"}
+      <button class="action-btn" ${b.level === 0 || isBusy || isBusyBuilding ? "disabled" : ""} onclick="startBuildingAction('upgrade', ${b.id})">
+        ${b.level === 0 ? "In Progress" : isBusyBuilding ? "Busy" : "Upgrade"}
       </button>
+      ${demolishButtonHTML}
     </div>
   `;
 }
 
+function confirmDemolish(buildingId, buildingName, level) {
+  if (!confirm(`Demolish this ${buildingName} (Lv ${level})? You'll get a partial resource refund, but this cannot be undone.`)) {
+    return;
+  }
+  startBuildingAction('demolish', buildingId);
+}
+
 async function collectResource(buildingId) {
   try {
-    const res = await fetch(`${API_BASE}/cities/${currentCityId}/collect`, {
+    const res = await fetch(`${API_BASE}/buildings/collect/${currentCityId}/${buildingId}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ buildingId })
+      headers: { "Content-Type": "application/json" }
     });
     const result = await res.json();
-    if (res.ok) refresh();
-    else showErrorModal(result.error || "Failed to collect resource");
+    if (res.ok && result.success !== false) {
+      refresh();
+    } else {
+      showErrorModal(result.error || result.message || "Failed to collect resources from field.");
+    }
   } catch (err) {
-    showErrorModal("Could not reach the server.");
+    showErrorModal("Could not reach the server to collect resources.");
   }
 }
 
-function renderBuildings(buildings, townHallLevel, isBusy) {
+function isOuterField(b) {
+  const name = (b.building_name || b.name || '').toLowerCase();
+  
+  // Exclude fortifications/defenses from outer fields (they belong in wall.html)
+  if (name.includes('trap') ||
+      name.includes('abatis') ||
+      name.includes('tower') ||
+      name.includes('rolling log') ||
+      name.includes('trebuchet') ||
+      name.includes('wall')) {
+    return false;
+  }
+  
+  if (b.slot_pool === 'outer') return true;
+  return name.includes('farm') ||
+         name.includes('sawmill') ||
+         name.includes('quarry') ||
+         name.includes('iron mine') ||
+         name.includes('gold mine');
+}
+
+/* Single source of truth for slot math — used by both the plot grid
+   render AND the "Available to Construct" catalog, so the two can
+   never disagree about how many open slots actually exist. */
+function computeSlotAvailability(buildings, townHallLevel) {
+  const thLvl = Math.max(1, Number(townHallLevel) || 1);
+  const safeBuildings = Array.isArray(buildings) ? buildings : [];
+
+  const innerList = safeBuildings.filter(b => !isOuterField(b));
+  const outerList = safeBuildings.filter(b => isOuterField(b));
+
+  const totalUnlockedInner = Math.min(32, thLvl * 4);
+  const totalUnlockedOuter = Math.min(40, thLvl * 4);
+
+  const openInnerCount = Math.max(0, totalUnlockedInner - innerList.length);
+  const openOuterCount = Math.max(0, totalUnlockedOuter - outerList.length);
+
+  return {
+    thLvl,
+    totalUnlockedInner,
+    totalUnlockedOuter,
+    openInnerCount,
+    openOuterCount,
+    innerList,
+    outerList
+  };
+}
+
+function renderBuildings(buildings, townHallLevel, isBusy, availableList = [], queue = []) {
   const innerEl = document.getElementById("inner-city-buildings");
   const outerEl = document.getElementById("outer-resource-fields");
+  if (!innerEl || !outerEl) return;
 
-  const innerList = (buildings || []).filter(b => b.slot_pool === 'inner' || b.slot_pool === 'fixed' || !b.slot_pool);
-  const outerList = (buildings || []).filter(b => b.slot_pool === 'outer');
+  // Capture whatever's currently selected in each open-slot dropdown
+  // BEFORE we destroy and rebuild the grid below — otherwise every
+  // 5-second auto-refresh silently resets any in-progress selection
+  // back to the first option.
+  const preservedSlotSelections = {};
+  document.querySelectorAll('[id^="select-inner-slot-"], [id^="select-outer-slot-"]').forEach(sel => {
+    if (sel.value) preservedSlotSelections[sel.id] = sel.value;
+  });
 
-  const thLvl = townHallLevel || 1;
+  // Match each building card to its own construction_queue entry (if any)
+  // by building_id, so upgrade/demolition animation is per-building
+  // instead of only ever showing for Academy's research state.
+  const queueByBuildingId = {};
+  (queue || []).forEach(q => { queueByBuildingId[q.building_id] = q; });
 
-  // --- INNER SLOTS CALCULATION ---
-  const totalUnlockedInner = Math.min(32, 5 + (thLvl * 3));
+  const slotInfo = computeSlotAvailability(buildings, townHallLevel);
+  const { thLvl, totalUnlockedInner, innerList, outerList } = slotInfo;
+
+  const innerOptions = availableList.filter(b => !isOuterField(b));
+  const outerOptions = availableList.filter(b => isOuterField(b));
+
   const builtInnerCount = innerList.length;
-  const openInnerCount = Math.max(0, totalUnlockedInner - builtInnerCount);
-  const lockedInnerCount = 32 - totalUnlockedInner;
+  const openInnerCount = slotInfo.openInnerCount;
+  const lockedInnerCount = Math.max(0, 32 - totalUnlockedInner);
 
   document.getElementById("inner-slot-badge").innerHTML = 
     `Built: <strong>${builtInnerCount}</strong> | Unlocked: <strong class="open">${totalUnlockedInner}</strong> / <strong>32</strong>`;
 
-  let innerHTML = innerList.map(b => makeBuildingCard(b, isBusy)).join("");
+  let innerHTML = innerList.map(b => makeBuildingCard(b, isBusy, queueByBuildingId[b.id])).join("");
 
-  // Render open inner slots
   for (let i = 0; i < openInnerCount; i++) {
-    innerHTML += `
-      <div class="building-card slot-open">
-        <div>
-          <div class="b-name" style="color: var(--green);">Empty Plot</div>
-          <div class="b-meta"><span style="color: var(--green);">Available</span></div>
-        </div>
-        <button class="action-btn" style="border-color: var(--green); color: var(--green);" onclick="document.getElementById('available-to-be-built').scrollIntoView({ behavior: 'smooth' })">
-          + Build
-        </button>
-      </div>
-    `;
+    innerHTML += makeOpenSlotCard(innerOptions, isBusy, `inner-slot-${i}`, "Empty Plot");
   }
 
-  // Render compact locked inner slots with padlock icon
   for (let i = 0; i < lockedInnerCount; i++) {
-    const requiredTH = Math.ceil((totalUnlockedInner + i + 1 - 5) / 3);
+    const requiredTH = Math.max(1, Math.ceil((totalUnlockedInner + i + 1) / 4));
     innerHTML += `
       <div class="building-card slot-locked" title="Requires Town Hall Lv ${requiredTH}">
         ${LOCK_ICON_SVG}
@@ -805,35 +2022,22 @@ function renderBuildings(buildings, townHallLevel, isBusy) {
 
   innerEl.innerHTML = innerHTML;
 
-  // --- OUTER SLOTS CALCULATION ---
-  const totalUnlockedOuter = Math.min(40, thLvl * 4);
+  const totalUnlockedOuter = slotInfo.totalUnlockedOuter;
   const builtOuterCount = outerList.length;
-  const openOuterCount = Math.max(0, totalUnlockedOuter - builtOuterCount);
-  const lockedOuterCount = 40 - totalUnlockedOuter;
+  const openOuterCount = slotInfo.openOuterCount;
+  const lockedOuterCount = Math.max(0, 40 - totalUnlockedOuter);
 
   document.getElementById("outer-slot-badge").innerHTML = 
     `Built: <strong>${builtOuterCount}</strong> | Unlocked: <strong class="open">${totalUnlockedOuter}</strong> / <strong>40</strong>`;
 
-  let outerHTML = outerList.map(b => makeBuildingCard(b, isBusy)).join("");
+  let outerHTML = outerList.map(b => makeBuildingCard(b, isBusy, queueByBuildingId[b.id])).join("");
 
-  // Render open outer slots
   for (let i = 0; i < openOuterCount; i++) {
-    outerHTML += `
-      <div class="building-card slot-open">
-        <div>
-          <div class="b-name" style="color: var(--green);">Open Field</div>
-          <div class="b-meta"><span style="color: var(--green);">Available</span></div>
-        </div>
-        <button class="action-btn" style="border-color: var(--green); color: var(--green);" onclick="document.getElementById('available-to-be-built').scrollIntoView({ behavior: 'smooth' })">
-          + Build Field
-        </button>
-      </div>
-    `;
+    outerHTML += makeOpenSlotCard(outerOptions, isBusy, `outer-slot-${i}`, "Open Field");
   }
 
-  // Render compact locked outer slots with padlock icon
   for (let i = 0; i < lockedOuterCount; i++) {
-    const requiredTH = Math.ceil((totalUnlockedOuter + i + 1) / 4);
+    const requiredTH = Math.max(1, Math.ceil((totalUnlockedOuter + i + 1) / 4));
     outerHTML += `
       <div class="building-card slot-locked" title="Requires Town Hall Lv ${requiredTH}">
         ${LOCK_ICON_SVG}
@@ -843,27 +2047,59 @@ function renderBuildings(buildings, townHallLevel, isBusy) {
   }
 
   outerEl.innerHTML = outerHTML;
+
+  lastSlotAvailability = slotInfo;
+
+  // Restore whatever was selected before this re-render. A slot index
+  // might no longer exist (fewer open slots than before) or the
+  // previously-picked building type might not be in this slot's
+  // options anymore — both are silently skipped rather than erroring.
+  Object.entries(preservedSlotSelections).forEach(([selectId, value]) => {
+    const sel = document.getElementById(selectId);
+    if (sel && [...sel.options].some(opt => opt.value === value)) {
+      sel.value = value;
+    }
+  });
 }
 
-function renderAvailableToBeBuilt(availableList, isBusy) {
-  const el = document.getElementById("available-to-be-built");
-  if (!availableList || availableList.length === 0) {
-    el.innerHTML = `<div class="empty-note">No new structures available at current Town Hall level</div>`;
-    return;
-  }
-
-  el.innerHTML = availableList.map(b => `
-    <div class="building-card">
-      <div>
-        <div class="b-name">${b.name}</div>
-        <div class="b-meta">
-          <span class="b-level">Lv 1</span>
-          <span class="b-tag">${b.slot_pool || "fixed"}</span>
+/* Renders one open (unlocked, unbuilt) plot as a dropdown of buildable
+   types + a Build button, replacing the old "scroll to catalog" pattern.
+   Each open slot is interchangeable, so all open slots of the same pool
+   (inner/outer) share the same options list. */
+function makeOpenSlotCard(options, isBusy, domId, emptyLabel) {
+  if (!options || options.length === 0) {
+    return `
+      <div class="building-card slot-open">
+        <div>
+          <div class="b-name" style="color: var(--green);">${emptyLabel}</div>
+          <div class="b-meta"><span class="b-tag">Nothing unlocked yet</span></div>
         </div>
       </div>
-      <button class="action-btn" ${isBusy ? "disabled" : ""} onclick="startBuildingAction('construct', ${b.id})">Build</button>
+    `;
+  }
+
+  return `
+    <div class="building-card slot-open">
+      <div style="width:100%;">
+        <div class="b-name" style="color: var(--green); margin-bottom:4px;">${emptyLabel}</div>
+        <select id="select-${domId}"
+          style="width:100%; background: var(--ink); color: var(--parchment); border:1px solid var(--line); font-family: var(--font-mono); font-size: 11px; padding: 3px 4px;">
+          ${options.map(b => `<option value="${b.id}">${b.name}</option>`).join("")}
+        </select>
+      </div>
+      <button class="action-btn" ${isBusy ? "disabled" : ""} style="border-color: var(--green); color: var(--green); margin-top:6px;"
+        onclick="submitBuildFromSlot('select-${domId}')">
+        + Build
+      </button>
     </div>
-  `).join("");
+  `;
+}
+
+/* Reads the chosen building type from an open slot's dropdown and submits it */
+function submitBuildFromSlot(selectDomId) {
+  const select = document.getElementById(selectDomId);
+  if (!select || !select.value) return;
+  startBuildingAction('construct', select.value);
 }
 
 function renderQueue(queue) {
@@ -893,13 +2129,13 @@ function tickCountdowns() {
   });
 }
 
-/* Building Rule Checks */
 async function startBuildingAction(actionType, id) {
-  // Workers-as-a-resource governs concurrency server-side now — no
-  // more blanket "queue occupied" block. Multiple builds/upgrades can
-  // run at once as long as enough workers are available; the server
-  // rejects with a specific shortfall message otherwise.
-  const endpoint = actionType === 'construct' ? '/buildings/construct' : '/buildings/upgrade';
+  const endpointMap = {
+    construct: '/buildings/construct',
+    upgrade: '/buildings/upgrade',
+    demolish: '/buildings/demolish'
+  };
+  const endpoint = endpointMap[actionType] || '/buildings/upgrade';
 
   const body = actionType === 'construct'
     ? { cityId: currentCityId, buildingTypeId: id }
@@ -919,48 +2155,115 @@ async function startBuildingAction(actionType, id) {
   }
 }
 
-async function refresh() {
+async function fetchJsonSafe(url) {
   try {
-    const res = await fetch(`${API_BASE}/cities/${currentCityId}`);
-    const data = await res.json();
-
-    document.getElementById("city-name").textContent = data.city.name;
-    document.getElementById("city-meta").textContent = `(${data.city.x}, ${data.city.y}) · Founded ${new Date(data.city.created_at).toLocaleDateString()}`;
-    document.getElementById("city-loyalty").textContent = data.city.loyalty ?? 100;
-    document.getElementById("city-grievance").textContent = data.city.grievance ?? 0;
-
-    currentGameState.queue = data.queue || [];
-
-    if (data.player) renderPlayerProfile(data.player);
-    if (data.resources) updateTicker(data.resources);
-
-    // Render Warehouse Capacity & Protection Stats
-    if (data.warehouseStats) {
-      document.getElementById("wh-capacity").textContent = formatNumber(data.warehouseStats.capacity);
-      document.getElementById("wh-protected").textContent = formatNumber(data.warehouseStats.protected);
-      document.getElementById("wh-at-risk").textContent = formatNumber(data.warehouseStats.atRisk);
+    const res = await fetch(url);
+    if (!res.ok) {
+      const errorHtml = await res.text();
+      console.error(`❌ HTTP Error ${res.status} at ${url}:`, errorHtml.slice(0, 300));
+      return null;
     }
-
-    const isBusy = false;
-
-    const townHall = (data.buildings || []).find(b => b.building_type_id === 1 || b.building_name === "Town Hall");
-    const townHallLevel = townHall ? townHall.level : 1;
-
-    renderBuildings(data.buildings || [], townHallLevel, isBusy);
-    renderAvailableToBeBuilt(data.availableBuildings || [], isBusy);
-    renderQueue(data.queue || []);
-    tickCountdowns();
-
+    return await res.json();
   } catch (err) {
-    document.getElementById("city-meta").textContent = "Connection lost — retrying…";
+    console.error(`❌ Network or JSON Parse Error at ${url}:`, err);
+    return null;
   }
 }
 
-document.getElementById("tax-rate-input")?.addEventListener("focus", () => { taxInputTouched = true; });
+/* Finds this city's mayor (if any) among its heroes and shows their name
+   plus which of Politics/Attack/Intelligence is their highest stat — e.g.
+   "Mayor: Alexander (P 82)". Re-runs on every refresh() call, so it
+   naturally flexes to whichever city is currently active without any
+   separate city-switch handling needed. */
+function renderMayorInfo(heroes) {
+  const el = document.getElementById("city-mayor-info");
+  if (!el) return;
 
+  const mayor = heroes.find(h => h.is_mayor);
+  if (!mayor) {
+    el.textContent = "Mayor: — (none appointed)";
+    return;
+  }
+
+  const stats = [
+    { label: "P", value: Number(mayor.politics || 0) },
+    { label: "A", value: Number(mayor.attack || 0) },
+    { label: "I", value: Number(mayor.intelligence || 0) }
+  ];
+  const topStat = stats.reduce((best, s) => (s.value > best.value ? s : best), stats[0]);
+
+  el.textContent = `Mayor: ${mayor.name} (${topStat.label} ${topStat.value})`;
+}
+
+async function refresh() {
+  try {
+    const data = await fetchJsonSafe(`${API_BASE}/cities/${currentCityId}`);
+    const buildings = await fetchJsonSafe(`${API_BASE}/buildings/city/${currentCityId}`);
+    const player = await fetchJsonSafe(`${API_BASE}/players/city/${currentCityId}`);
+    const researchState = await fetchJsonSafe(`${API_BASE}/research?cityId=${currentCityId}`);
+    const heroesRes = await fetchJsonSafe(`${API_BASE}/cities/${currentCityId}/heroes`);
+    const heroes = heroesRes?.heroes || [];
+    if (data && data.city) {
+      document.getElementById("city-name").textContent = data.city.name || "Capital";
+      document.getElementById("city-meta").textContent = 
+        `(${data.city.x ?? 0}, ${data.city.y ?? 0}) · Founded ${data.city.created_at ? new Date(data.city.created_at).toLocaleDateString() : 'N/A'}`;
+    }
+
+    renderMayorInfo(Array.isArray(heroes) ? heroes : []);
+
+    const whCap = data?.city?.warehouse_capacity ?? data?.resources?.warehouse_capacity ?? data?.warehouse?.capacity ?? 0;
+    const whProt = data?.city?.protected_resources ?? data?.resources?.protected_resources ?? data?.warehouse?.protected ?? 0;
+    const whRisk = data?.city?.at_risk_resources ?? data?.resources?.at_risk_resources ?? data?.warehouse?.at_risk ?? 0;
+
+    if (document.getElementById("wh-capacity")) {
+      document.getElementById("wh-capacity").textContent = formatNumber(whCap);
+    }
+    if (document.getElementById("wh-protected")) {
+      document.getElementById("wh-protected").textContent = formatNumber(whProt);
+    }
+    if (document.getElementById("wh-at-risk")) {
+      document.getElementById("wh-at-risk").textContent = formatNumber(whRisk);
+    }
+
+    if (data && data.queue) {
+      if (typeof currentGameState !== 'undefined') currentGameState.queue = data.queue;
+      renderQueue(data.queue);
+    }
+    if (data && data.resources) updateTicker(data.resources);
+
+    if (player && typeof renderPlayerProfile === 'function') {
+      renderPlayerProfile(player);
+    }
+
+    if (Array.isArray(buildings)) {
+      if (typeof currentGameState !== 'undefined') currentGameState.buildings = buildings;
+      
+      const townHall = buildings.find(b => b.building_name === 'Town Hall');
+      const townHallLevel = townHall ? townHall.level : 1;
+      const availableList = (data && data.availableBuildings) || [];
+      
+      // Filter out fortifications from available buildings (they only appear in wall.html)
+      const filteredAvailableList = availableList.filter(b => {
+        const name = (b.building_name || b.name || '').toLowerCase();
+        return !(name.includes('trap') ||
+                 name.includes('abatis') ||
+                 name.includes('tower') ||
+                 name.includes('rolling log') ||
+                 name.includes('trebuchet') ||
+                 name.includes('wall'));
+      });
+
+      renderBuildings(buildings, townHallLevel, false, filteredAvailableList, (data && data.queue) || []);
+    }
+
+  } catch (err) {
+    console.error("Critical error inside refresh():", err);
+  }
+}
+
+setInterval(tickCountdowns, 1000);
 refresh();
 setInterval(refresh, 5000);
-setInterval(tickCountdowns, 1000);
 </script>
 
 </body>

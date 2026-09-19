@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Empire — World Map</title>
+<style>
+  :root {
+    --ink: #14110d;
+    --panel: #1c1710;
+    --panel-raised: #241e15;
+    --line: #3d3020;
+    --brass: #c89b3c;
+    --brass-dim: #8a6e2c;
+    --green: #6b8f5a;
+    --rust: #a8462e;
+    --parchment: #eae0cb;
+    --faded: #8a7c63;
+    --font-mono: 'JetBrains Mono', monospace;
+    --valley: #7a5ea8;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--ink);
+    color: var(--parchment);
+    font-family: var(--font-mono);
+    overflow: hidden;
+  }
+
+  #map-page {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  #map-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--panel);
+    border-bottom: 2px solid var(--brass-dim);
+  }
+
+  #map-header h1 {
+    font-size: 15px;
+    color: var(--brass);
+    margin: 0;
+  }
+
+  #back-to-city {
+    background: none;
+    border: 1px solid var(--line);
+    color: var(--parchment);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 5px 10px;
+    cursor: pointer;
+  }
+  #back-to-city:hover { border-color: var(--brass); color: var(--brass); }
+
+  #map-legend {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 6px 12px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    font-size: 10px;
+    color: var(--faded);
+    flex-wrap: wrap;
+  }
+
+  .legend-swatch {
+    display: inline-block;
+    width: 9px; height: 9px;
+    margin-right: 3px;
+    border: 1px solid var(--line);
+    vertical-align: middle;
+  }
+
+  #map-body {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+  }
+
+  #map-canvas {
+    flex: 1;
+    width: 0;
+    background: var(--ink);
+    cursor: grab;
+    display: block;
+  }
+  #map-canvas.dragging { cursor: grabbing; }
+
+  #tile-panel {
+    flex: 0 0 260px;
+    width: 260px;
+    min-width: 260px;
+    max-width: 260px;
+    background: var(--panel-raised);
+    border-left: 1px solid var(--line);
+    padding: 12px;
+    font-size: 11px;
+    overflow-y: auto;
+    box-sizing: border-box;
+  }
+
+  #tile-panel h3 {
+    color: var(--brass);
+    font-size: 13px;
+    margin: 0 0 8px;
+  }
+
+  .tile-row { margin: 4px 0; color: var(--parchment); }
+  .tile-label { color: var(--faded); }
+
+  .tile-action-btn {
+    display: block;
+    width: 100%;
+    background: var(--brass);
+    color: var(--ink);
+    border: none;
+    padding: 7px 10px;
+    font-weight: bold;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    cursor: pointer;
+    margin-top: 10px;
+  }
+  .tile-action-btn:hover { background: var(--parchment); }
+  .tile-action-btn.danger { background: var(--rust); color: var(--parchment); }
+  .tile-action-btn.danger:hover { background: #c0553a; }
+
+  #tile-empty-state { color: var(--faded); }
+
+  .zoom-btn {
+    background: var(--ink);
+    border: 1px solid var(--line);
+    color: var(--parchment);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    width: 22px; height: 22px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .zoom-btn:hover { border-color: var(--brass); color: var(--brass); }
+
+  #zoom-select {
+    background: var(--ink);
+    border: 1px solid var(--line);
+    color: var(--parchment);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    padding: 3px 4px;
+  }
+</style>
+</head>
+<body>
+<div id="map-page">
+  <div id="map-header">
+    <h1>🗺️ World Map</h1>
+    <button id="show-holdings-btn" onclick="showHoldings()" style="margin-right: 8px;">📦 My Holdings</button>
+    <button id="back-to-city" onclick="window.close()">← Back to City</button>
+  </div>
+
+  <div id="map-legend">
+    <span><span class="legend-swatch" style="background: var(--panel-raised);"></span>Empty</span>
+    <span><span class="legend-swatch" style="background: #3a2f1a;"></span>🏰 City</span>
+    <span><span class="legend-swatch" style="background: #2a3325;"></span>🌾🪵🪨⛏️ Resource</span>
+    <span><span class="legend-swatch" style="background: #3a1f18;"></span>💀 NPC Camp</span>
+    <span><span class="legend-swatch" style="background: #2a2035;"></span>🏞️ Valley</span>
+
+    <span id="zoom-controls" style="margin-left: auto; display: flex; align-items: center; gap: 6px;">
+      <span id="hover-coords" style="color: var(--brass-dim); min-width: 90px; text-align: right;">(--, --)</span>
+      <span style="color: var(--line);">|</span>
+      <span>🔍</span>
+      <button class="zoom-btn" onclick="adjustZoom(-1)">−</button>
+      <select id="zoom-select" onchange="setZoom(parseInt(this.value, 10))">
+        <option value="50">50%</option>
+        <option value="75">75%</option>
+        <option value="100">100%</option>
+        <option value="150">150%</option>
+        <option value="200" selected>200%</option>
+        <option value="300">300%</option>
+        <option value="400">400%</option>
+      </select>
+      <button class="zoom-btn" onclick="adjustZoom(1)">+</button>
+    </span>
+  </div>
+
+  <div id="map-body">
+    <canvas id="map-canvas"></canvas>
+    <div id="tile-panel">
+      <div id="tile-empty-state">Click a tile to inspect it.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_BASE = "";
+const params = new URLSearchParams(window.location.search);
+const myCityId = params.get("cityId") ? Number(params.get("cityId")) : null;
+
+let mapTiles = new Map();   // "x,y" -> tile
+const BASE_TILE_SIZE = 20;  // tile px at 100% zoom
+let zoomPct = 200;          // default zoom level
+let tileSize = BASE_TILE_SIZE * (zoomPct / 100);
+let offsetX = 0, offsetY = 0;
+let dragging = false, dragStartX = 0, dragStartY = 0;
+let ctx = null;
+
+const TILE_COLORS = {
+  EMPTY: "#241e15",
+  CITY: "#3a2f1a",
+  RESOURCE: "#2a3325",
+  NPC: "#3a1f18",
+  VALLEY: "#2a2035"
+};
+
+const RESOURCE_ICONS = {
+  food: "🌾",
+  wood: "🪵",
+  stone: "🪨",
+  iron: "⛏️"
+};
+
+function getTileIcon(tile) {
+  if (tile.tile_type === "CITY") return "🏰";
+  if (tile.tile_type === "NPC") return "💀";
+  if (tile.tile_type === "VALLEY") return "🏞️";
+  if (tile.tile_type === "RESOURCE") return RESOURCE_ICONS[tile.resource_type] || "❔";
+  return null;
+}
+
+function getTileLevel(tile) {
+  if (tile.tile_type === "CITY") return tile.city_th_level != null ? tile.city_th_level : null;
+  if (tile.tile_type === "NPC") return tile.npc_level;
+  if (tile.tile_type === "RESOURCE") return tile.resource_level;
+  return null; // Valley levels aren't tracked yet (cycling-bonus system not built).
+}
+
+const ZOOM_STEPS = [50, 75, 100, 150, 200, 300, 400];
+
+function getCenterTile() {
+  const canvas = document.getElementById("map-canvas");
+  return {
+    x: (canvas.width / 2 - offsetX) / tileSize,
+    y: (canvas.height / 2 - offsetY) / tileSize
+  };
+}
+
+function applyZoom(newPct) {
+  const canvas = document.getElementById("map-canvas");
+  const center = getCenterTile();
+  zoomPct = newPct;
+  tileSize = BASE_TILE_SIZE * (zoomPct / 100);
+  offsetX = canvas.width / 2 - center.x * tileSize;
+  offsetY = canvas.height / 2 - center.y * tileSize;
+  document.getElementById("zoom-select").value = String(zoomPct);
+  draw();
+}
+
+function setZoom(pct) {
+  applyZoom(pct);
+}
+
+function adjustZoom(direction) {
+  const currentIndex = ZOOM_STEPS.indexOf(zoomPct);
+  const nextIndex = currentIndex === -1
+    ? ZOOM_STEPS.findIndex(z => z >= zoomPct) // fall back to nearest step
+    : Math.min(ZOOM_STEPS.length - 1, Math.max(0, currentIndex + direction));
+  applyZoom(ZOOM_STEPS[Math.max(0, nextIndex)]);
+}
+
+async function fetchJson(url, options) {
+  try {
+    const res = await fetch(url, options);
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    console.error("Map fetch error:", err);
+    return null;
+  }
+}
+
+async function init() {
+  const canvas = document.getElementById("map-canvas");
+  ctx = canvas.getContext("2d");
+  resizeCanvas();
+  document.getElementById("zoom-select").value = String(zoomPct);
+
+  if (canvas.width === 0 || canvas.height === 0) {
+    console.error("Map canvas has zero size at init:", canvas.width, canvas.height);
+  }
+
+  try {
+    const data = await fetchJson(`${API_BASE}/map`);
+    if (!data || !data.success) {
+      showMapMessage("Failed to load map. Check the console/network tab for the actual error.");
+      return;
+    }
+
+    if (!data.tiles || data.tiles.length === 0) {
+      showMapMessage("Map has 0 tiles. Run POST /map/generate first, then reload this page.");
+      return;
+    }
+
+    data.tiles.forEach(t => mapTiles.set(`${t.x},${t.y}`, t));
+
+    // Center on the player's own city if we know where it is, otherwise the map center.
+    const myTile = myCityId ? data.tiles.find(t => t.city_id === myCityId) : null;
+    const centerX = myTile ? myTile.x : data.mapSize / 2;
+    const centerY = myTile ? myTile.y : data.mapSize / 2;
+    offsetX = canvas.width / 2 - centerX * tileSize;
+    offsetY = canvas.height / 2 - centerY * tileSize;
+
+    draw();
+    wireInteraction();
+  } catch (err) {
+    console.error("Map init error:", err);
+    showMapMessage(`Map failed to render: ${err.message}. See console for details.`);
+  }
+}
+
+function showMapMessage(message) {
+  document.getElementById("tile-empty-state").innerHTML = message;
+  // Also draw it directly on the canvas — the panel text is easy to miss
+  // since it's off to the side, and the canvas is what's actually blank.
+  ctx.fillStyle = "#0a0806";
+  ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  ctx.fillStyle = "#a8462e";
+  ctx.font = "14px monospace";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(message, ctx.canvas.width / 2, ctx.canvas.height / 2, ctx.canvas.width - 40);
+}
+
+function resizeCanvas() {
+  const canvas = document.getElementById("map-canvas");
+  canvas.width = canvas.clientWidth;
+  canvas.height = canvas.clientHeight;
+}
+
+function draw() {
+  const canvas = document.getElementById("map-canvas");
+  ctx.fillStyle = "#0a0806";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const startX = Math.max(0, Math.floor(-offsetX / tileSize));
+  const startY = Math.max(0, Math.floor(-offsetY / tileSize));
+  const endX = Math.min(100, Math.ceil((canvas.width - offsetX) / tileSize));
+  const endY = Math.min(100, Math.ceil((canvas.height - offsetY) / tileSize));
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  for (let x = startX; x < endX; x++) {
+    for (let y = startY; y < endY; y++) {
+      const tile = mapTiles.get(`${x},${y}`);
+      const px = offsetX + x * tileSize;
+      const py = offsetY + y * tileSize;
+      const isMine = tile && tile.city_id === myCityId;
+
+      ctx.fillStyle = tile ? (TILE_COLORS[tile.tile_type] || TILE_COLORS.EMPTY) : TILE_COLORS.EMPTY;
+      ctx.fillRect(px, py, tileSize - 1, tileSize - 1);
+
+      if (isMine) {
+        ctx.strokeStyle = "#eae0cb";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(px + 1, py + 1, tileSize - 3, tileSize - 3);
+      }
+
+      // Stationed-troops indicator — valleys being Harvested or resource
+      // fields held by this city (distinct gold ring from the white
+      // "this is my city tile" outline above, since a held valley/field
+      // isn't a city tile).
+      if (myHoldingCoords.has(`${x},${y}`)) {
+        ctx.strokeStyle = "#d4a531";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([3, 2]);
+        ctx.strokeRect(px + 2, py + 2, tileSize - 5, tileSize - 5);
+        ctx.setLineDash([]);
+      }
+
+      if (!tile || tile.tile_type === "EMPTY") continue;
+
+      const icon = getTileIcon(tile);
+      const level = getTileLevel(tile);
+      const cx = px + tileSize / 2;
+
+      if (icon) {
+        ctx.font = `${Math.floor(tileSize * 0.55)}px sans-serif`;
+        ctx.fillText(icon, cx, py + tileSize * 0.4);
+      }
+      if (level != null) {
+        ctx.font = `bold ${Math.max(7, Math.floor(tileSize * 0.32))}px var(--font-mono), monospace`;
+        ctx.fillStyle = "#eae0cb";
+        ctx.fillText(String(level), cx, py + tileSize * 0.82);
+      }
+    }
+  }
+}
+
+function updateHoverCoords(e) {
+  const canvas = document.getElementById("map-canvas");
+  const rect = canvas.getBoundingClientRect();
+  const readout = document.getElementById("hover-coords");
+
+  const mouseX = e.clientX - rect.left;
+  const mouseY = e.clientY - rect.top;
+
+  if (mouseX < 0 || mouseY < 0 || mouseX > rect.width || mouseY > rect.height) {
+    readout.textContent = "(--, --)";
+    return;
+  }
+
+  const tileX = Math.floor((mouseX - offsetX) / tileSize);
+  const tileY = Math.floor((mouseY - offsetY) / tileSize);
+
+  if (tileX < 0 || tileY < 0 || tileX >= 100 || tileY >= 100) {
+    readout.textContent = "(--, --)";
+    return;
+  }
+
+  readout.textContent = `(${tileX}, ${tileY})`;
+}
+
+function wireInteraction() {
+  const canvas = document.getElementById("map-canvas");
+
+  canvas.addEventListener("mousedown", (e) => {
+    dragging = true;
+    dragStartX = e.clientX - offsetX;
+    dragStartY = e.clientY - offsetY;
+    canvas.classList.add("dragging");
+  });
+
+  window.addEventListener("mousemove", (e) => {
+    if (dragging) {
+      offsetX = e.clientX - dragStartX;
+      offsetY = e.clientY - dragStartY;
+      draw();
+    }
+    updateHoverCoords(e);
+  });
+
+  window.addEventListener("mouseup", () => {
+    dragging = false;
+    canvas.classList.remove("dragging");
+  });
+
+  canvas.addEventListener("click", (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const clickX = e.clientX - rect.left - offsetX;
+    const clickY = e.clientY - rect.top - offsetY;
+    const tileX = Math.floor(clickX / tileSize);
+    const tileY = Math.floor(clickY / tileSize);
+    if (tileX < 0 || tileY < 0 || tileX >= 100 || tileY >= 100) return;
+    selectTile(tileX, tileY);
+  });
+
+  window.addEventListener("resize", () => {
+    resizeCanvas();
+    draw();
+  });
+}
+
+async function selectTile(x, y) {
+  const panel = document.getElementById("tile-panel");
+  panel.innerHTML = `<div style="color: var(--faded);">Loading tile (${x}, ${y})...</div>`;
+
+  const result = await fetchJson(`${API_BASE}/map/tile/${x}/${y}`);
+  if (!result || !result.success) {
+    panel.innerHTML = `<div style="color: var(--rust);">Failed to load tile.</div>`;
+    return;
+  }
+  const tile = result.tile;
+  const isMine = tile.city_id === myCityId;
+
+  let html = `<h3>Tile (${x}, ${y})</h3>`;
+  html += `<div class="tile-row"><span class="tile-label">Type:</span> ${tile.tile_type}</div>`;
+
+  if (tile.tile_type === "EMPTY") {
+    html += `<div class="tile-row" style="color: var(--faded);">Open wilderness.</div>`;
+    html += `<button class="tile-action-btn" onclick="notImplemented('Found City')">Found City Here</button>`;
+
+  } else if (tile.tile_type === "CITY") {
+    html += `<div class="tile-row">${tile.city_name || "Unnamed City"}${tile.city_th_level != null ? ` (TH ${tile.city_th_level})` : ""}</div>`;
+    if (isMine) {
+      html += `<div class="tile-row" style="color: var(--green);">This is your Capital.</div>`;
+    } else {
+      html += `<button class="tile-action-btn" onclick="notImplemented('Scout')">Scout</button>`;
+      html += `<button class="tile-action-btn danger" onclick="notImplemented('Attack')">Attack</button>`;
+    }
+
+  } else if (tile.tile_type === "RESOURCE") {
+    html += `<div class="tile-row"><span class="tile-label">Resource:</span> ${tile.resource_type}</div>`;
+    html += `<div class="tile-row"><span class="tile-label">Level:</span> ${tile.resource_level}</div>`;
+    html += `<div id="gather-detail" class="tile-row" style="color: var(--faded);">Loading field status...</div>`;
+    panel.innerHTML = html;
+    loadGatherDetail(x, y);
+    return;
+
+  } else if (tile.tile_type === "NPC") {
+    html += `<div id="npc-detail" class="tile-row" style="color: var(--faded);">Loading garrison...</div>`;
+    panel.innerHTML = html;
+    loadNpcDetail(x, y);
+    return;
+
+  } else if (tile.tile_type === "VALLEY") {
+    html += `<div id="valley-detail" class="tile-row" style="color: var(--faded);">Loading field data...</div>`;
+    panel.innerHTML = html;
+    loadValleyDetail(x, y);
+    return;
+  }
+
+  panel.innerHTML = html;
+}
+
+async function loadNpcDetail(x, y) {
+  const el = document.getElementById("npc-detail");
+  const result = await fetchJson(`${API_BASE}/npc/tile/${x}/${y}`);
+  if (!el) return; // panel may have been re-rendered by another click already
+
+  if (!result || !result.success) {
+    el.innerHTML = `Garrison data unavailable. (Has POST /npc/seed been run?)`;
+    return;
+  }
+  const npc = result.npc;
+  let html = `
+    <div><span class="tile-label">Level:</span> ${npc.level}</div>
+    <div><span class="tile-label">Loyalty:</span> ${npc.loyalty}/100</div>
+    <div><span class="tile-label">Warriors:</span> ${Number(npc.warrior).toLocaleString()}</div>
+    <div><span class="tile-label">Pikemen:</span> ${Number(npc.pikeman).toLocaleString()}</div>
+    <div><span class="tile-label">Swordsmen:</span> ${Number(npc.swordsman).toLocaleString()}</div>
+    <div><span class="tile-label">Archers:</span> ${Number(npc.archer).toLocaleString()}</div>
+    <div><span class="tile-label">Cavalry:</span> ${Number(npc.cavalry).toLocaleString()}</div>
+    <div><span class="tile-label">Wall Level:</span> ${npc.wall_level}</div>
+  `;
+
+  const fortTotal = NPC_FORT_CODES.reduce((sum, c) => sum + Number(npc[c] || 0), 0);
+  if (fortTotal > 0) {
+    html += `<div style="margin-top: 6px; color: var(--faded);">Fortifications:</div>`;
+    NPC_FORT_CODES.forEach(code => {
+      if (Number(npc[code]) > 0) {
+        html += `<div>${NPC_FORT_LABELS[code]}: ${Number(npc[code]).toLocaleString()}</div>`;
+      }
+    });
+  }
+
+  html += `<div id="npc-attack-form-container"></div>`;
+  html += `<button id="npc-attack-toggle-btn" class="tile-action-btn danger" onclick="showNpcAttackForm(${x}, ${y})">Attack</button>`;
+
+  el.innerHTML = html;
+}
+
+const NPC_FORT_CODES = ["traps", "abatis", "archer_tower", "rolling_log", "defensive_trebuchet"];
+const NPC_FORT_LABELS = {
+  traps: "🕳️ Traps",
+  abatis: "🌵 Abatis",
+  archer_tower: "🏹 Archer Tower",
+  rolling_log: "🪵 Rolling Log",
+  defensive_trebuchet: "💥 Defensive Trebuchet"
+};
+
+// Same roster npc.service.js's attackNpcCity accepts (ATTACKER_UNIT_CODES) —
+// full player-mobile roster, warrior excluded since it's npc/valley-only.
+const NPC_ATTACKER_CODES = [
+  "pikeman", "swordsman", "archer", "cavalry", "cataphract",
+  "ballista", "battering_ram", "catapult", "scout", "transporter"
+];
+const NPC_ATTACKER_ICONS = {
+  pikeman: "🔱", swordsman: "⚔️", archer: "🏹", cavalry: "🐎", cataphract: "🛡️",
+  ballista: "🎯", battering_ram: "🪵", catapult: "💥", scout: "🔍", transporter: "🚚"
+};
+function unitLabel(code) {
+  return code.split("_").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+}
+
+async function showNpcAttackForm(x, y) {
+  const container = document.getElementById("npc-attack-form-container");
+  if (!container) return;
+  const toggleBtn = document.getElementById("npc-attack-toggle-btn");
+  if (toggleBtn) toggleBtn.style.display = "none";
+  container.innerHTML = `<div style="color: var(--faded);">Loading your army...</div>`;
+
+  const data = await fetchJson(`${API_BASE}/units/barracks?cityId=${myCityId}`);
+  const owned = {};
+  NPC_ATTACKER_CODES.forEach(c => { owned[c] = 0; });
+  if (data && data.success && data.units) {
+    data.units.forEach(u => {
+      const code = (u.code || "").toLowerCase();
+      if (NPC_ATTACKER_CODES.includes(code)) owned[code] = Number(u.owned || 0);
+    });
+  }
+
+  // Idle heroes only — a hero already Mayor/Marching/Captured can't lead
+  // this attack. Optional: attacking with no hero is still valid, just
+  // earns no Combat XP.
+  // BUGFIX: two compounding issues previously zeroed this out entirely —
+  // (1) /cities/:cityId/heroes returns {success, heroes: [...]}, not a bare
+  // array, so Array.isArray(heroesData) was always false; (2) status comes
+  // back lowercase ("idle"), but the filter compared against "IDLE".
+  let idleHeroes = [];
+  try {
+    const heroesData = await fetchJson(`${API_BASE}/cities/${myCityId}/heroes`);
+    const heroesList = Array.isArray(heroesData) ? heroesData : (heroesData?.heroes || []);
+    idleHeroes = heroesList.filter(h => (h.status || "").toLowerCase() === "idle");
+  } catch (e) { /* heroes endpoint optional — attack still works without it */ }
+
+  let formHtml = `<div style="margin-top: 8px; border-top: 1px solid var(--line); padding-top: 8px;">`;
+
+  if (idleHeroes.length > 0) {
+    formHtml += `
+      <div style="margin: 3px 0;">
+        <label style="color: var(--faded); font-size: 10px;">Lead with hero (optional):</label>
+        <select id="npc-attack-hero" style="width: 100%; background: var(--ink); border: 1px solid var(--line); color: var(--parchment); font-family: var(--font-mono); font-size: 10px; padding: 3px;">
+          <option value="">— None —</option>
+          ${idleHeroes.map(h => `<option value="${h.id}">${h.name} (Lv ${h.level}, ATK ${h.attack})</option>`).join("")}
+        </select>
+      </div>
+    `;
+  }
+
+  NPC_ATTACKER_CODES.forEach(code => {
+    formHtml += `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin: 3px 0;">
+        <span>${NPC_ATTACKER_ICONS[code] || ""} ${unitLabel(code)} (own ${owned[code]})</span>
+        <input type="number" id="npc-send-${code}" min="0" max="${owned[code]}" value="0" style="width: 55px; background: var(--ink); border: 1px solid var(--line); color: var(--parchment); font-family: var(--font-mono); font-size: 10px; text-align: center;">
+      </div>
+    `;
+  });
+  formHtml += `<button class="tile-action-btn danger" onclick="submitNpcAttack(${x}, ${y})">Confirm Attack</button>`;
+  formHtml += `</div>`;
+  container.innerHTML = formHtml;
+}
+
+async function submitNpcAttack(x, y) {
+  const troops = {};
+  NPC_ATTACKER_CODES.forEach(code => {
+    const input = document.getElementById(`npc-send-${code}`);
+    troops[code] = Math.max(0, Number(input?.value || 0));
+  });
+  const heroSelect = document.getElementById("npc-attack-hero");
+  const heroId = heroSelect && heroSelect.value ? Number(heroSelect.value) : null;
+
+  const result = await fetchJson(`${API_BASE}/npc/${x}/${y}/attack`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cityId: myCityId, troops, heroId })
+  });
+
+  if (!result || !result.success) {
+    alert(`Attack failed: ${result?.error || "Unknown error"}`);
+    return;
+  }
+
+  if (result.won) {
+    const plunderLines = result.plunder
+      ? Object.entries(result.plunder).map(([res, amt]) => `${res}: ${Number(amt).toLocaleString()}`).join(", ")
+      : "none";
+    const capNote = result.carryInfo?.cappedByCapacity
+      ? ` (carry capacity limited — could have hauled ${Number(result.carryInfo.totalAvailable).toLocaleString()} total, only carried ${Number(result.carryInfo.totalCarryCapacity).toLocaleString()})`
+      : "";
+    let xpNote = "";
+    if (result.heroXp) {
+      xpNote = ` Hero gained ${result.heroXp.xpGained} XP`;
+      if (result.heroXp.levelsGained > 0) {
+        xpNote += ` and leveled up to ${result.heroXp.hero.level} (+${result.heroXp.levelsGained} Attack)!`;
+      } else {
+        xpNote += ".";
+      }
+    }
+    alert(`Victory! Plundered — ${plunderLines}${capNote}. Loyalty now ${result.npc.loyalty}/100.${xpNote}`);
+  } else {
+    alert("Defeat — the garrison held. Your troops took losses.");
+  }
+  selectTile(x, y);
+}
+
+// Same attacker roster as NPC/valley attacks — resourceField.service.js's
+// ATTACKER_UNIT_CODES. Field guard is warrior/pikeman/swordsman/archer only
+// (no cavalry), but attackers can still send anything mobile.
+const GATHER_ATTACKER_CODES = [
+  "pikeman", "swordsman", "archer", "cavalry", "cataphract",
+  "ballista", "battering_ram", "catapult", "scout", "transporter"
+];
+
+async function loadGatherDetail(x, y) {
+  const el = document.getElementById("gather-detail");
+  const result = await fetchJson(`${API_BASE}/resource-field/tile/${x}/${y}`);
+  if (!el) return;
+
+  if (!result || !result.success) {
+    el.innerHTML = `Field data unavailable. (Has POST /resource-field/seed been run?)`;
+    return;
+  }
+
+  const field = result.field;
+  const isMine = field.owner_city_id === myCityId;
+  const isOccupied = !!field.owner_city_id;
+
+  let html = "";
+  if (isOccupied) {
+    html += `<div><span class="tile-label">Held by:</span> ${isMine ? "Your city" : `City #${field.owner_city_id}`}</div>`;
+    html += `<div><span class="tile-label">Guard:</span> ${UNIT_ICONS?.warrior || "🗡️"} ${Number(field.warrior).toLocaleString()} ${UNIT_ICONS?.pikeman || "🔱"} ${Number(field.pikeman).toLocaleString()} ${UNIT_ICONS?.swordsman || "⚔️"} ${Number(field.swordsman).toLocaleString()} ${UNIT_ICONS?.archer || "🏹"} ${Number(field.archer).toLocaleString()}</div>`;
+    html += `<div><span class="tile-label">Harvest rate:</span> ${Number(result.hourlyRate).toLocaleString()}/hr</div>`;
+    if (isMine) {
+      html += `<div><span class="tile-label">Accrued:</span> ${Number(result.accruedHarvest).toLocaleString()}</div>`;
+      if (field.recall_at) {
+        html += `<div style="color: var(--faded);">Recall in progress — departs ${new Date(field.recall_at).toLocaleTimeString()}.</div>`;
+      } else {
+        html += `<button class="tile-action-btn" onclick="submitGatherRecall(${x}, ${y})">Recall (collect &amp; withdraw)</button>`;
+      }
+    }
+  } else {
+    html += `<div style="color: var(--faded);">Unoccupied — guarded by forsaken troops.</div>`;
+    html += `<div><span class="tile-label">Guard:</span> ${UNIT_ICONS?.warrior || "🗡️"} ${Number(field.warrior).toLocaleString()} ${UNIT_ICONS?.pikeman || "🔱"} ${Number(field.pikeman).toLocaleString()} ${UNIT_ICONS?.swordsman || "⚔️"} ${Number(field.swordsman).toLocaleString()} ${UNIT_ICONS?.archer || "🏹"} ${Number(field.archer).toLocaleString()}</div>`;
+  }
+
+  if (!isMine) {
+    html += `<div id="gather-attack-form-container"></div>`;
+    html += `<button id="gather-attack-toggle-btn" class="tile-action-btn danger" onclick="showGatherAttackForm(${x}, ${y})">Send Gathering Party</button>`;
+  }
+
+  el.innerHTML = html;
+}
+
+async function showGatherAttackForm(x, y) {
+  const container = document.getElementById("gather-attack-form-container");
+  if (!container) return;
+  const toggleBtn = document.getElementById("gather-attack-toggle-btn");
+  if (toggleBtn) toggleBtn.style.display = "none";
+  container.innerHTML = `<div style="color: var(--faded);">Loading your army...</div>`;
+
+  const data = await fetchJson(`${API_BASE}/units/barracks?cityId=${myCityId}`);
+  const owned = {};
+  GATHER_ATTACKER_CODES.forEach(c => { owned[c] = 0; });
+  if (data && data.success && data.units) {
+    data.units.forEach(u => {
+      const code = (u.code || "").toLowerCase();
+      if (GATHER_ATTACKER_CODES.includes(code)) owned[code] = Number(u.owned || 0);
+    });
+  }
+
+  let formHtml = `<div style="margin-top: 8px; border-top: 1px solid var(--line); padding-top: 8px;">`;
+  GATHER_ATTACKER_CODES.forEach(code => {
+    formHtml += `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin: 3px 0;">
+        <span>${NPC_ATTACKER_ICONS[code] || ""} ${unitLabel(code)} (own ${owned[code]})</span>
+        <input type="number" id="gather-send-${code}" min="0" max="${owned[code]}" value="0" style="width: 55px; background: var(--ink); border: 1px solid var(--line); color: var(--parchment); font-family: var(--font-mono); font-size: 10px; text-align: center;">
+      </div>
+    `;
+  });
+  formHtml += `<button class="tile-action-btn danger" onclick="submitGatherAttack(${x}, ${y})">Confirm Attack</button>`;
+  formHtml += `</div>`;
+  container.innerHTML = formHtml;
+}
+
+async function submitGatherAttack(x, y) {
+  const troops = {};
+  GATHER_ATTACKER_CODES.forEach(code => {
+    const input = document.getElementById(`gather-send-${code}`);
+    troops[code] = Math.max(0, Number(input?.value || 0));
+  });
+
+  const result = await fetchJson(`${API_BASE}/resource-field/${x}/${y}/attack`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cityId: myCityId, troops })
+  });
+
+  if (!result || !result.success) {
+    alert(`Attack failed: ${result?.error || "Unknown error"}`);
+    return;
+  }
+
+  if (result.won) {
+    alert("Victory! Your troops are now stationed and gathering.");
+  } else {
+    alert("Defeat — the guard held. Your troops took losses.");
+  }
+  selectTile(x, y);
+}
+
+async function submitGatherRecall(x, y) {
+  const result = await fetchJson(`${API_BASE}/resource-field/${x}/${y}/recall`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cityId: myCityId })
+  });
+
+  if (!result || !result.success) {
+    alert(`Recall failed: ${result?.error || "Unknown error"}`);
+    return;
+  }
+
+  const capNote = result.cappedByCapacity
+    ? ` (carry capacity limited — ${Number(result.totalAvailable).toLocaleString()} was accrued, garrison could only carry ${Number(result.totalCarryCapacity).toLocaleString()}; the rest was left behind)`
+    : "";
+  alert(`Collected ${Number(result.collected).toLocaleString()} ${result.resourceType || ""}${capNote}. Troops depart in 5 minutes.`);
+  selectTile(x, y);
+}
+
+
+const UNIT_CODES = ["warrior", "pikeman", "swordsman", "archer", "cavalry"];
+const UNIT_ICONS = { warrior: "🗡️", pikeman: "🔱", swordsman: "⚔️", archer: "🏹", cavalry: "🐎" };
+const FIELD_TYPE_RESOURCE_NAMES = { Lake: "Food", Forest: "Wood", Hill: "Stone", Desert: "Iron" };
+
+async function showHoldings() {
+  const panel = document.getElementById("tile-panel");
+  if (!panel) return;
+  panel.innerHTML = `<h3>📦 My Holdings</h3><div style="color: var(--faded);">Loading...</div>`;
+
+  const data = await fetchJson(`${API_BASE}/holdings/${myCityId}`);
+  if (!data || !data.success) {
+    panel.innerHTML = `<h3>📦 My Holdings</h3><div>Failed to load: ${data?.error || "unknown error"}</div>`;
+    return;
+  }
+
+  let html = `<h3>📦 My Holdings</h3>`;
+
+  html += `<div class="tile-row" style="margin-top: 6px; color: var(--brass-dim); font-weight: bold;">Resource Fields (${data.resourceFields.length})</div>`;
+  if (data.resourceFields.length === 0) {
+    html += `<div style="color: var(--faded);">None held.</div>`;
+  }
+  data.resourceFields.forEach(f => {
+    html += `
+      <div class="tile-row" style="border-top: 1px solid var(--line); padding-top: 4px; margin-top: 4px;">
+        <div><strong>(${f.x}, ${f.y})</strong> — ${f.resourceType}, Lv ${f.level}</div>
+        <div style="color: var(--faded); font-size: 10px;">
+          Garrison: ${UNIT_ICONS.pikeman} ${f.garrison.pikeman} ${UNIT_ICONS.swordsman} ${f.garrison.swordsman} ${UNIT_ICONS.archer} ${f.garrison.archer}
+        </div>
+        <div>Rate: <strong>${Number(f.hourlyRate).toLocaleString()}/hr</strong>
+          <span style="color: var(--faded); font-size: 10px;">(raw ${Number(f.rawTroopPower).toLocaleString()} × level bonus +${f.levelBonusPct}%)</span>
+        </div>
+        <div>Accrued: ${Number(f.accruedHarvest).toLocaleString()}${f.wouldBeCappedOnRecall ? ` <span style="color: #d99;">(exceeds carry capacity of ${Number(f.totalCarryCapacity).toLocaleString()} — recall now to avoid losing the excess)</span>` : ""}</div>
+        ${f.recallAt
+          ? `<div style="color: var(--faded);">Recalling — departs ${new Date(f.recallAt).toLocaleTimeString()}</div>`
+          : `<div style="display:flex; gap:6px; margin-top: 4px;">
+               <button class="tile-action-btn" onclick="holdingsCollectResourceField(${f.x}, ${f.y})">Collect</button>
+               <button class="tile-action-btn" onclick="holdingsRecallResourceField(${f.x}, ${f.y})">Recall</button>
+             </div>`}
+      </div>
+    `;
+  });
+
+  html += `<div class="tile-row" style="margin-top: 12px; color: var(--brass-dim); font-weight: bold;">Valleys (${data.valleys.length})</div>`;
+  if (data.valleys.length === 0) {
+    html += `<div style="color: var(--faded);">None held.</div>`;
+  }
+  data.valleys.forEach(v => {
+    html += `
+      <div class="tile-row" style="border-top: 1px solid var(--line); padding-top: 4px; margin-top: 4px;">
+        <div><strong>(${v.x}, ${v.y})</strong> — ${v.fieldType} (${v.resourceType}), Lv ${v.level}</div>
+        <div style="color: var(--faded); font-size: 10px;">
+          Garrison: ${UNIT_ICONS.pikeman} ${v.garrison.pikeman} ${UNIT_ICONS.swordsman} ${v.garrison.swordsman} ${UNIT_ICONS.archer} ${v.garrison.archer} ${UNIT_ICONS.cavalry} ${v.garrison.cavalry}
+        </div>
+        <div>Hero: ${v.hero || "—"}</div>
+        <div>City production bonus: <strong>+${v.productionBonusPct}% ${v.resourceType}</strong></div>
+        ${v.recallAt
+          ? `<div style="color: var(--faded);">Recalling — hero &amp; troops return ${new Date(v.recallAt).toLocaleTimeString()}</div>`
+          : `<button class="tile-action-btn" style="margin-top: 4px;" onclick="holdingsRecallValley(${v.x}, ${v.y})">End Harvest (Recall)</button>`}
+      </div>
+    `;
+  });
+
+  panel.innerHTML = html;
+}
+
+
+const VALLEY_ATTACKER_CODES = [
+  "pikeman", "swordsman", "archer", "cavalry", "cataphract",
+  "ballista", "battering_ram", "catapult", "scout", "transporter"
+];
+
+async function loadValleyDetail(x, y) {
+  const el = document.getElementById("valley-detail");
+  const result = await fetchJson(`${API_BASE}/valley/tile/${x}/${y}`);
+  if (!el) return;
+
+  if (!result || !result.success) {
+    el.innerHTML = `Field data unavailable. (Has POST /valley/seed been run?)`;
+    return;
+  }
+
+  const v = result.valley;
+  const isMine = myCityId && v.owner_city_id === myCityId;
+  const garrisonTotal = UNIT_CODES.reduce((sum, c) => sum + Number(v[c] || 0), 0);
+
+  let html = `
+    <div><span class="tile-label">Type:</span> ${v.field_type} (${FIELD_TYPE_RESOURCE_NAMES[v.field_type] || ""})</div>
+    <div><span class="tile-label">Level:</span> ${v.level}</div>
+    <div><span class="tile-label">Held by:</span> ${v.owner_city_id ? (isMine ? "You" : `City #${v.owner_city_id}`) : "Unclaimed (NPC guard)"}</div>
+  `;
+
+  if (isMine) {
+    const bonusPct = Math.min(Number(v.level) * 3, 30);
+    html += `<div><span class="tile-label">City production bonus:</span> +${bonusPct}% ${FIELD_TYPE_RESOURCE_NAMES[v.field_type] || ""}</div>`;
+    if (v.recall_at) {
+      html += `<div style="color: var(--brass);">Recalling — hero &amp; troops return at ${new Date(v.recall_at).toLocaleTimeString()}</div>`;
+    } else {
+      html += `<button class="tile-action-btn" onclick="submitValleyRecall(${x}, ${y})">End Harvest (Recall)</button>`;
+    }
+  } else {
+    html += `<div style="margin-top: 6px; color: var(--faded);">Garrison (${garrisonTotal} total):</div>`;
+    UNIT_CODES.forEach(code => {
+      if (Number(v[code]) > 0) {
+        html += `<div>${UNIT_ICONS[code]} ${code}: ${Number(v[code]).toLocaleString()}</div>`;
+      }
+    });
+    html += `<div id="valley-action-form-container"></div>`;
+    html += `<div style="display: flex; gap: 6px; margin-top: 6px;">`;
+    html += `<button id="valley-harvest-toggle-btn" class="tile-action-btn" style="flex:1;" onclick="showValleyActionForm(${x}, ${y}, 'harvest')">Harvest</button>`;
+    html += `<button id="valley-raid-toggle-btn" class="tile-action-btn danger" style="flex:1;" onclick="showValleyActionForm(${x}, ${y}, 'raid')">Raid</button>`;
+    html += `</div>`;
+  }
+
+  el.innerHTML = html;
+}
+
+async function showValleyActionForm(x, y, mode) {
+  // mode: 'harvest' (station, hero REQUIRED) or 'raid' (hit-and-return, hero optional)
+  const container = document.getElementById("valley-action-form-container");
+  if (!container) return;
+  const harvestBtn = document.getElementById("valley-harvest-toggle-btn");
+  const raidBtn = document.getElementById("valley-raid-toggle-btn");
+  if (harvestBtn) harvestBtn.style.display = "none";
+  if (raidBtn) raidBtn.style.display = "none";
+  container.innerHTML = `<div style="color: var(--faded);">Loading your army...</div>`;
+
+  const [armyData, heroesData] = await Promise.all([
+    fetchJson(`${API_BASE}/units/barracks?cityId=${myCityId}`),
+    fetchJson(`${API_BASE}/cities/${myCityId}/heroes`).catch(() => [])
+  ]);
+
+  const owned = {};
+  VALLEY_ATTACKER_CODES.forEach(c => { owned[c] = 0; });
+  if (armyData && armyData.success && armyData.units) {
+    armyData.units.forEach(u => {
+      const code = (u.code || "").toLowerCase();
+      if (VALLEY_ATTACKER_CODES.includes(code)) owned[code] = Number(u.owned || 0);
+    });
+  }
+  // BUGFIX: same two compounding issues as showNpcAttackForm — heroesData
+  // is {success, heroes: [...]}, not a bare array, and status comes back
+  // lowercase ("idle") not "IDLE". This one matters even more since Harvest
+  // requires a hero (heroRequired below) — this bug made Harvest completely
+  // unusable, not just XP-optional like the NPC attack form.
+  const heroesList = Array.isArray(heroesData) ? heroesData : (heroesData?.heroes || []);
+  const idleHeroes = heroesList.filter(h => (h.status || "").toLowerCase() === "idle");
+
+  let formHtml = `<div style="margin-top: 8px; border-top: 1px solid var(--line); padding-top: 8px;">`;
+  formHtml += `<div style="color: var(--brass); font-size: 11px; margin-bottom: 4px;">${mode === "harvest" ? "Harvest (station troops + hero — boosts your city's production)" : "Raid (hit-and-return — no capture, troops always come home)"}</div>`;
+
+  const heroRequired = mode === "harvest";
+  formHtml += `
+    <div style="margin: 3px 0;">
+      <label style="color: var(--faded); font-size: 10px;">${heroRequired ? "Hero (required):" : "Lead with hero (optional):"}</label>
+      <select id="valley-action-hero" style="width: 100%; background: var(--ink); border: 1px solid var(--line); color: var(--parchment); font-family: var(--font-mono); font-size: 10px; padding: 3px;">
+        ${heroRequired ? "" : `<option value="">— None —</option>`}
+        ${idleHeroes.map(h => `<option value="${h.id}">${h.name} (Lv ${h.level}, ATK ${h.attack})</option>`).join("")}
+      </select>
+      ${idleHeroes.length === 0 ? `<div style="color: #d99; font-size: 10px;">No idle heroes available.</div>` : ""}
+    </div>
+  `;
+
+  VALLEY_ATTACKER_CODES.forEach(code => {
+    formHtml += `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin: 3px 0;">
+        <span>${NPC_ATTACKER_ICONS[code] || ""} ${unitLabel(code)} (own ${owned[code]})</span>
+        <input type="number" id="valley-send-${code}" min="0" max="${owned[code]}" value="0" style="width: 55px; background: var(--ink); border: 1px solid var(--line); color: var(--parchment); font-family: var(--font-mono); font-size: 10px; text-align: center;">
+      </div>
+    `;
+  });
+  formHtml += `<button class="tile-action-btn ${mode === "raid" ? "danger" : ""}" onclick="submitValleyAction(${x}, ${y}, '${mode}')">Confirm ${mode === "harvest" ? "Harvest" : "Raid"}</button>`;
+  formHtml += `</div>`;
+  container.innerHTML = formHtml;
+}
+
+async function submitValleyAction(x, y, mode) {
+  const troops = {};
+  VALLEY_ATTACKER_CODES.forEach(code => {
+    const input = document.getElementById(`valley-send-${code}`);
+    troops[code] = Math.max(0, Number(input?.value || 0));
+  });
+  const heroSelect = document.getElementById("valley-action-hero");
+  const heroId = heroSelect && heroSelect.value ? Number(heroSelect.value) : null;
+
+  if (mode === "harvest" && !heroId) {
+    alert("Harvest requires a hero to lead it.");
+    return;
+  }
+
+  const endpoint = mode === "harvest" ? "harvest" : "raid";
+  const result = await fetchJson(`${API_BASE}/valley/${x}/${y}/${endpoint}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cityId: myCityId, troops, heroId })
+  });
+
+  if (!result || !result.success) {
+    alert(`${mode === "harvest" ? "Harvest" : "Raid"} failed: ${result?.error || "Unknown error"}`);
+    return;
+  }
+
+  if (mode === "harvest") {
+    alert(result.won ? "Victory! Your hero and troops are now stationed, boosting city production." : "Defeat — the garrison held. Your troops took losses; your hero stayed home.");
+  } else {
+    let msg = result.won ? "Victory!" : "Defeat — the guard held. Your troops took losses.";
+    if (result.won && result.evicted) msg += " The previous holder's Harvest was evicted.";
+    if (result.won && result.heroXp) msg += ` Hero gained ${result.heroXp.xpGained} XP.`;
+    alert(msg);
+  }
+  selectTile(x, y);
+}
+
+async function submitValleyRecall(x, y) {
+  const result = await fetchJson(`${API_BASE}/valley/${x}/${y}/recall`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cityId: myCityId })
+  });
+
+  if (!result || !result.success) {
+    alert(`Recall failed: ${result?.error || "Unknown error"}`);
+    return;
+  }
+
+  alert(`Harvest ending — hero and troops return in 30 seconds.`);
+  selectTile(x, y);
+}
+
+function notImplemented(actionName) {
+  alert(`${actionName}: not wired up yet — world actions are the next phase.`);
+}
+
+// ----------------------------------------------------------------------------
+// My Holdings: on-map indicator + inline Recall
+// ----------------------------------------------------------------------------
+
+let myHoldingCoords = new Set(); // "x,y" strings, refreshed whenever holdings load
+
+async function refreshHoldingCoords() {
+  try {
+    const data = await fetchJson(`${API_BASE}/holdings/${myCityId}`);
+    myHoldingCoords = new Set();
+    if (data && data.success) {
+      (data.valleys || []).forEach(v => myHoldingCoords.add(`${v.x},${v.y}`));
+      (data.resourceFields || []).forEach(f => myHoldingCoords.add(`${f.x},${f.y}`));
+    }
+  } catch (e) { /* non-fatal — map just won't show indicators this refresh */ }
+  if (typeof draw === "function") draw();
+}
+
+async function holdingsRecallValley(x, y) {
+  const result = await fetchJson(`${API_BASE}/valley/${x}/${y}/recall`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cityId: myCityId })
+  });
+  if (!result || !result.success) {
+    alert(`Recall failed: ${result?.error || "Unknown error"}`);
+    return;
+  }
+  alert(`Harvest ending — hero and troops return in 30 seconds.`);
+  showHoldings();
+}
+
+async function holdingsRecallResourceField(x, y) {
+  const result = await fetchJson(`${API_BASE}/resource-field/${x}/${y}/recall`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cityId: myCityId })
+  });
+  if (!result || !result.success) {
+    alert(`Recall failed: ${result?.error || "Unknown error"}`);
+    return;
+  }
+  const capNote = result.cappedByCapacity
+    ? ` (carry capacity limited — ${Number(result.totalAvailable).toLocaleString()} was accrued, garrison could only carry ${Number(result.totalCarryCapacity).toLocaleString()})`
+    : "";
+  alert(`Collected ${Number(result.collected).toLocaleString()} ${result.resourceType || ""}${capNote}. Troops depart in 5 minutes.`);
+  showHoldings();
+}
+
+// Collect: same accrual/capacity math as Recall, but leaves the garrison
+// in place — the field stays held and keeps producing. Added alongside
+// Recall so a player can cash out periodically without giving up the tile.
+async function holdingsCollectResourceField(x, y) {
+  const result = await fetchJson(`${API_BASE}/resource-field/${x}/${y}/collect`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cityId: myCityId })
+  });
+  if (!result || !result.success) {
+    alert(`Collect failed: ${result?.error || "Unknown error"}`);
+    return;
+  }
+  const capNote = result.cappedByCapacity
+    ? ` (carry capacity limited — ${Number(result.totalAvailable).toLocaleString()} was accrued, garrison could only carry ${Number(result.totalCarryCapacity).toLocaleString()})`
+    : "";
+  alert(`Collected ${Number(result.collected).toLocaleString()} ${result.resourceType || ""}${capNote}. Garrison stays in place.`);
+  showHoldings();
+}
+
+init();
+refreshHoldingCoords();
+</script>
+</body>
+</html>

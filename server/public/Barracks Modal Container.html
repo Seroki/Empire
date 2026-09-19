@@ -1,0 +1,314 @@
+<!-- BARRACKS MODAL CONTAINER -->
+<div class="modal-overlay" id="barracks-modal" role="dialog" aria-modal="true" onclick="closeBarracksGui(event)">
+  <div class="game-modal-panel" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2>🏰 Barracks Training Ground</h2>
+      <button class="close-btn" aria-label="Close Barracks" onclick="closeBarracksGui()">&times;</button>
+    </div>
+
+    <!-- Dynamic Content injected here -->
+    <div id="barracks-content">
+      <p style="font-size: 11px; color: var(--faded); padding: 12px;">Loading Barracks Data...</p>
+    </div>
+  </div>
+</div>
+
+<script>
+let activeBarracksId = null;
+let activeCityId = null;
+
+function safeFormatNumber(val) {
+  if (typeof formatNumber === "function") return formatNumber(val);
+  return Number(val || 0).toLocaleString();
+}
+
+function safeDomId(str) {
+  return String(str || "").replace(/[^a-zA-Z0-9_-]/g, "_");
+}
+
+async function openBarracksGui(cityId = window.currentCityId, targetBarracksId = null) {
+  const modal = document.getElementById("barracks-modal");
+  const content = document.getElementById("barracks-content");
+  if (!modal || !content) return;
+
+  activeCityId = cityId;
+  modal.classList.add("visible");
+
+  let data;
+  let res;
+
+  try {
+    // Pass barracksId to fetch facility-scoped units, levels, and queues
+    const queryUrl = targetBarracksId 
+      ? `${API_BASE}/units/barracks?cityId=${cityId}&barracksId=${targetBarracksId}`
+      : `${API_BASE}/units/barracks?cityId=${cityId}`;
+
+    res = await fetch(queryUrl);
+    data = await res.json();
+
+    if (!res.ok || !data.success) {
+      content.innerHTML = `<div style="color: var(--rust); padding: 12px;">${data?.error || "Failed to load Barracks."}</div>`;
+      return;
+    }
+
+    const barracksList = data.barracks || [];
+    if (barracksList.length === 0) {
+      content.innerHTML = `<div class="empty-note" style="padding: 12px;">No Barracks constructed in this city yet. Build one from the Inner City plots!</div>`;
+      return;
+    }
+
+    // Set selected facility context
+    const selectedBarracks = barracksList.find(b => b.id == targetBarracksId) || barracksList[0];
+    activeBarracksId = selectedBarracks.id;
+
+    const availablePop = Number(data.availablePopulation || 0);
+    const allUnits = data.units || [];
+    const queueList = data.queue || [];
+
+    let html = `
+      <!-- TAB NAVIGATION STRIP -->
+      <div style="display:flex; border-bottom:1px solid var(--line); background:var(--ink); padding:4px 8px 0 8px; gap:4px; overflow-x:auto;">
+        ${barracksList.map((b, idx) => {
+          const isActive = b.id == activeBarracksId;
+          return `
+            <button onclick="openBarracksGui(${cityId}, ${b.id})" style="
+              padding: 6px 12px;
+              font-family: var(--font-mono);
+              font-size: 11px;
+              cursor: pointer;
+              border: 1px solid var(--line);
+              border-bottom: ${isActive ? "1px solid var(--panel-raised)" : "1px solid var(--line)"};
+              background: ${isActive ? "var(--panel-raised)" : "rgba(0,0,0,0.3)"};
+              color: ${isActive ? "var(--brass)" : "var(--faded)"};
+              font-weight: ${isActive ? "bold" : "normal"};
+              border-top-left-radius: 4px;
+              border-top-right-radius: 4px;
+              margin-bottom: -1px;
+            ">
+              🏛️ Barracks #${idx + 1} (Lv ${b.level})
+            </button>
+          `;
+        }).join("")}
+      </div>
+
+      <!-- POPULATION BAR -->
+      <div style="display:flex; justify-content:flex-end; align-items:center; margin:8px; background:var(--panel-raised); padding:6px 8px; border:1px solid var(--line);">
+        <div style="font-size:11px;">
+          <span style="color:var(--faded);">Idle Pop:</span>
+          <strong style="color:${availablePop > 0 ? "var(--green)" : "var(--rust)"};">
+            ${safeFormatNumber(availablePop)}
+          </strong>
+        </div>
+      </div>
+    `;
+
+    /* UNIT TABLE */
+    if (allUnits.length > 0) {
+      const currentBarracksLevel = Number(selectedBarracks.level || 1);
+
+      html += `
+        <table style="width:100%; border-collapse:collapse;">
+          <thead>
+            <tr style="border-bottom:1px solid var(--line); text-align:left;">
+              <th style="padding:6px;">UNIT</th>
+              <th style="padding:6px;">STATS & COSTS</th>
+              <th style="padding:6px; text-align:center;">OWNED</th>
+              <th style="padding:6px;">RECRUIT ORDER</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      allUnits.forEach(u => {
+        const reqLevel = Number(u.required_barracks_level || u.min_barracks_level || u.required_level || 1);
+        const hasLevel = currentBarracksLevel >= reqLevel;
+        const meetsPrereqs = u.isAvailable !== false && u.canTrain !== false;
+        const unlocked = hasLevel && meetsPrereqs;
+
+        let lockReason = "";
+        if (!hasLevel) {
+          lockReason = `Req. Barracks Lv ${reqLevel}`;
+        } else if (!meetsPrereqs) {
+          lockReason = u.reason || u.lock_reason || "Prerequisites Unmet";
+        }
+
+        const popCost = Math.max(1, Number(u.population_cost || u.pop_cost || 1));
+        const resObj = data.resources || data;
+        const foodAvail  = resObj.food  !== undefined ? Number(resObj.food)  : null;
+        const woodAvail  = resObj.wood  !== undefined ? Number(resObj.wood)  : null;
+        const stoneAvail = resObj.stone !== undefined ? Number(resObj.stone) : null;
+        const ironAvail  = resObj.iron  !== undefined ? Number(resObj.iron)  : null;
+        const goldAvail  = resObj.gold  !== undefined ? Number(resObj.gold)  : null;
+
+        let limits = [Math.floor(availablePop / popCost)];
+        if (foodAvail  !== null && u.food_cost  > 0) limits.push(Math.floor(foodAvail  / u.food_cost));
+        if (woodAvail  !== null && u.wood_cost  > 0) limits.push(Math.floor(woodAvail  / u.wood_cost));
+        if (stoneAvail !== null && u.stone_cost > 0) limits.push(Math.floor(stoneAvail / u.stone_cost));
+        if (ironAvail  !== null && u.iron_cost  > 0) limits.push(Math.floor(ironAvail  / u.iron_cost));
+        if (goldAvail  !== null && u.gold_cost  > 0) limits.push(Math.floor(goldAvail  / u.gold_cost));
+
+        const maxTrainable = unlocked ? Math.max(0, Math.min(...limits)) : 0;
+        const domId = safeDomId(u.code);
+
+        html += `
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.05); ${!unlocked ? "opacity: 0.35; background: rgba(0,0,0,0.15);" : ""}">
+            <td style="padding:6px;">
+              <strong style="color:${unlocked ? "var(--parchment)" : "var(--faded)"};">${u.name}</strong>
+              <div style="font-size:9px; color:var(--faded); margin-top:2px;">
+                ${unlocked ? `👥 Pop: ${popCost}` : `<span style="color:var(--rust); font-weight:600;">🔒 ${lockReason}</span>`}
+              </div>
+            </td>
+
+            <td style="padding:6px; font-size:10px;">
+              ⚔️ ${u.attack || u.base_attack || 0} | 🛡️ ${u.defense || u.base_defense || 0}<br>
+              <span style="color:var(--faded);">
+                🌾${u.food_cost || 0} | 🪵${u.wood_cost || 0} | 🪨${u.stone_cost || 0} | ⛏️${u.iron_cost || 0} | 🪙${u.gold_cost || 0}
+              </span>
+            </td>
+
+            <td style="padding:6px; text-align:center; font-weight:bold; color:var(--brass);">
+              ${safeFormatNumber(u.owned || 0)}
+            </td>
+
+            <td style="padding:6px;">
+              ${unlocked ? `
+                <div style="display:flex; gap:4px; align-items:center;">
+                  <input type="number" id="train-qty-${domId}" value="${maxTrainable > 0 ? 1 : 0}" min="${maxTrainable > 0 ? 1 : 0}" max="${maxTrainable}"
+                    ${maxTrainable === 0 ? "disabled" : ""}
+                    style="width:48px; background:var(--ink); color:var(--parchment); border:1px solid var(--line); font-family:var(--font-mono); font-size:11px; padding:2px 4px;">
+
+                  <button class="btn-secondary" onclick="setMaxTrainable('${domId}', ${maxTrainable})"
+                    ${maxTrainable === 0 ? "disabled" : ""}
+                    style="font-size:9px; padding:2px 5px;">Max</button>
+
+                  <button class="btn-primary" onclick="submitTrainOrder(event, '${domId}', '${u.code}')"
+                    ${maxTrainable === 0 ? "disabled" : ""}
+                    style="font-size:10px; padding:2px 6px;">TRAIN</button>
+                </div>
+                <div style="font-size:8px; color:var(--faded); margin-top:2px;">
+                  Max: ${safeFormatNumber(maxTrainable)}
+                </div>
+              ` : `
+                <div style="font-size:10px; color:var(--rust); font-style:italic;">
+                  🔒 Locked (${lockReason})
+                </div>
+              `}
+            </td>
+          </tr>
+        `;
+      });
+
+      html += `</tbody></table>`;
+    } else {
+      html += `<div class="empty-note" style="padding:12px;">No unit definitions available.</div>`;
+    }
+
+    /* BARRACKS-SPECIFIC QUEUE */
+    if (queueList.length > 0) {
+      html += `
+        <div style="margin-top:12px; border-top:1px solid var(--line); padding-top:8px;">
+          <h4 style="font-size:11px; color:var(--brass); margin:0 0 6px 8px; text-transform:uppercase;">
+            Queue for Barracks #${activeBarracksId}
+          </h4>
+          <table style="width:100%; border-collapse:collapse; font-size:10px;">
+            <thead>
+              <tr style="text-align:left; color:var(--faded); border-bottom:1px solid rgba(255,255,255,0.05);">
+                <th style="padding:4px 8px;">Unit</th>
+                <th style="padding:4px 8px;">Qty</th>
+                <th style="padding:4px 8px;">Completes At</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${queueList.map(q => `
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
+                  <td style="padding:4px 8px; color:var(--parchment);">${q.name}</td>
+                  <td style="padding:4px 8px; font-weight:600;">${safeFormatNumber(q.quantity)}</td>
+                  <td style="padding:4px 8px; color:var(--brass-dim);">
+                    ${new Date(q.finish_at).toLocaleString()}
+                  </td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    content.innerHTML = html;
+
+  } catch (err) {
+    console.error("Barracks GUI Error:", err);
+    content.innerHTML = `<div style="color:var(--rust); padding:12px;">Could not connect to game server.</div>`;
+  }
+}
+
+function setMaxTrainable(domId, maxAmount) {
+  const input = document.getElementById(`train-qty-${domId}`);
+  if (input) input.value = Math.max(0, maxAmount);
+}
+
+async function submitTrainOrder(evt, domId, unitCode) {
+  const qtyInput = document.getElementById(`train-qty-${domId}`);
+  const btn = evt?.currentTarget || evt?.target;
+  const quantity = Math.max(1, Number(qtyInput?.value) || 1);
+
+  if (!activeBarracksId) {
+    if (typeof showErrorModal === "function") showErrorModal("No Barracks selected.");
+    else alert("No Barracks selected.");
+    return;
+  }
+
+  if (btn) btn.disabled = true;
+
+  try {
+    const res = await fetch(`${API_BASE}/units/train`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        cityId: activeCityId || window.currentCityId,
+        barracksId: activeBarracksId,
+        unitCode: unitCode,
+        quantity: quantity
+      })
+    });
+
+    const result = await res.json();
+
+    if (res.ok && result.success) {
+      openBarracksGui(activeCityId || window.currentCityId, activeBarracksId);
+      if (typeof refresh === "function") refresh();
+    } else {
+      if (typeof showErrorModal === "function") showErrorModal(result.error || "Training order rejected.");
+      else alert(result.error || "Training order rejected.");
+    }
+  } catch {
+    if (typeof showErrorModal === "function") showErrorModal("Could not reach recruitment server.");
+    else alert("Could not reach recruitment server.");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function closeBarracksGui(event) {
+  if (!event || event.target === event.currentTarget) {
+    document.getElementById("barracks-modal")?.classList.remove("visible");
+  }
+}
+</script>
+
+/**            troop unlocks must always be considered
+Warrior	(blg) Barracks 1—(blg) Cottage 1 – (blg)Farm 1 = troop Warrior opened
+Pikeman	(blg) Iron-mine 1 – (blg) Academy 1 (rec) troop 1 (footman) -- (rec) craftsmen 1-- (rec) general 1
+Swordsmen	(blg)Iron mine 2- (blg)barracks 2-(rec)Ore production 1 – (rec)blacksmithing 1 – (rec)weapons 1—(rec)swordsmen = troop swordsmen opened
+Scouts	(blg)Barracks 2-(blg)beacon tower 2 – (rec)academy 2-(rec) horse husbandry 1 (rec)1-speed 1-(rec)scouts = troop scout opened
+Archer	(blg)Barracks 3 – (blg) sawmill 3 – (rec) troop 1 (archers) -- (rec) troop improvement 1-(rec) weapons 1-(rec) Bowery and Fletching 1 –(rec) general 2 = troop Archer opened
+Long bowmen	(blg)Barracks 6 – (blg) sawmill 6 – (rec) troop 1 (archers) -- (rec) troop improvement 3-(rec) weapons 3-(rec) Bowery and Fletching 2 –(rec) general 5 = troop long bowmen opened
+Cross bowmen	(blg)Barracks 8– (blg) sawmill 8– (rec) troop 1 (archers) -- (rec) troop improvement 4-(rec) weapons 4-(rec) Bowery and Fletching 3 –(rec) general 7 = troop crossbowmen opened
+Light Calvary	(blg) Barracks 4 – (blg) stable 4 – (rec) horse husbandry 1-- (rec) general 4-(rec) weapons 2 –(rec) speed 2 = troop Light Calvary opened
+Transporters	(blg) Work shop 5 – (blg) Stables 5 – (rec)horse husbandry 2 –(rec) armor 2 – (rec) Mechanisms 1 = troop Transporters opened
+Cataphracts	(blg) Barracks 6 – (blg) Stables 6 – (blg) work shop 6 – (rec) speed 3 -- (rec) horse husbandry 3 -(rec) general 6 – (rec) farm production 6 = Troop Cataphract opened
+Battering rams	(blg) Barracks 7 – (blg) sawmill 7 – (blg) workshop 7 – (rec) woodworking 3 – (rec) troop 4 (siege) – (rec)  Engineering 2 – (rec) Mechanisms 2 = Troop Battering ram opened
+Catapults	(blg) Barracks 9 – (blg) sawmill 9 – (blg) workshop 9 – (rec) weapons 4 – (rec) troop 4 (siege) – (rec)  Engineering 3 – (rec) Mechanisms 3 = Troop Catapults opened
+Barista	(blg) Barracks 10 – (blg) sawmill 10 – (blg) workshop 10 – (rec) weapons 4 – (rec) troop 4 (siege) – (rec)  Engineering 4 – (rec) Mechanisms 4 = Troop Balista opened
+
+ */
